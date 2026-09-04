@@ -3,9 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import { supabase } from "@/integrations/supabase/client";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Textarea } from "@/components/ui/textarea";
+import { StatusDot, TermBox, TermScreen } from "@/components/terminal";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/sessions/$sessionId")({
@@ -92,70 +90,73 @@ function SessionPage() {
   const session = data?.session;
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-4xl flex-col px-4 py-6">
-      <header className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-border pb-4">
-        <div className="min-w-0">
-          <Link to="/dashboard" className="text-xs text-muted-foreground hover:underline">
-            ← Todas as sessões
+    <TermScreen className="flex min-h-screen flex-col">
+      <TermBox tone="accent" className="px-4 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="min-w-0 truncate text-primary">✻ {session?.title ?? "Sessão"}</p>
+          <Link to="/dashboard" className="shrink-0 text-xs text-muted-foreground hover:text-primary">
+            /sessions
           </Link>
-          <h1 className="truncate text-xl font-semibold">{session?.title ?? "Sessão"}</h1>
-          <p className="truncate text-xs text-muted-foreground">
-            {session?.source} · {session?.cwd ?? "—"}
-          </p>
         </div>
-        <Badge>{session?.status ?? "…"}</Badge>
-      </header>
+        <p className="mt-1 flex items-center gap-2 truncate text-xs text-muted-foreground">
+          <StatusDot status={session?.status ?? "idle"} />
+          {session?.status ?? "…"} · {session?.source} · {session?.cwd ?? "—"}
+        </p>
+      </TermBox>
 
-      <div className="flex-1 space-y-4 overflow-y-auto pb-4">
-        {(data?.messages ?? []).map((m) => (
-          <article
-            key={m.id}
-            className={
-              m.role === "user"
-                ? "ml-auto max-w-[85%] rounded-lg bg-primary px-4 py-3 text-primary-foreground"
-                : "max-w-[95%] rounded-lg bg-card px-4 py-3 text-card-foreground ring-1 ring-border"
-            }
-          >
-            <p className="mb-1 text-[10px] uppercase tracking-wide opacity-70">{m.role}</p>
-            <div className="prose prose-sm max-w-none dark:prose-invert">
-              <ReactMarkdown>{m.content}</ReactMarkdown>
+      <div className="flex-1 space-y-3 overflow-y-auto py-4">
+        {(data?.messages ?? []).map((m) =>
+          m.role === "user" ? (
+            <div key={m.id} className="flex gap-2">
+              <span className="select-none text-primary">&gt;</span>
+              <div className="min-w-0 flex-1 whitespace-pre-wrap text-foreground">{m.content}</div>
             </div>
-          </article>
-        ))}
+          ) : (
+            <div key={m.id} className="flex gap-2">
+              <span className="select-none text-primary">⏺</span>
+              <div className="prose prose-sm min-w-0 max-w-none flex-1 text-muted-foreground dark:prose-invert prose-p:my-1 prose-pre:bg-card prose-pre:text-xs">
+                <ReactMarkdown>{m.content}</ReactMarkdown>
+              </div>
+            </div>
+          ),
+        )}
         {(data?.replies ?? [])
           .filter((r) => r.status === "pending")
           .map((r) => (
-            <article
-              key={r.id}
-              className="ml-auto max-w-[85%] rounded-lg border border-dashed border-primary px-4 py-3 text-sm"
-            >
-              <p className="mb-1 text-[10px] uppercase tracking-wide opacity-70">
-                sua resposta · aguardando entrega
-              </p>
-              {r.content}
-            </article>
+            <div key={r.id} className="flex gap-2 opacity-70">
+              <span className="select-none text-primary">&gt;</span>
+              <div className="min-w-0 flex-1">
+                <span className="whitespace-pre-wrap text-foreground">{r.content}</span>
+                <span className="ml-2 text-xs text-muted-foreground">✳ enviando…</span>
+              </div>
+            </div>
           ))}
         <div ref={bottomRef} />
       </div>
 
-      <div className="sticky bottom-0 flex gap-2 border-t border-border bg-background py-3">
-        <Textarea
-          ref={inputRef}
-          value={reply}
-          placeholder="Responder ao agente…"
-          rows={2}
-          onChange={(e) => setReply(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              void send();
-            }
-          }}
-        />
-        <Button onClick={() => void send()} disabled={sending || !reply.trim()}>
-          Enviar
-        </Button>
+      <div className="sticky bottom-0 bg-background pb-4 pt-2">
+        <div className="flex items-start gap-2 rounded-md border border-border px-3 py-2 focus-within:border-primary/70">
+          <span className="select-none pt-0.5 text-primary">&gt;</span>
+          <textarea
+            ref={inputRef}
+            value={reply}
+            rows={1}
+            placeholder="Responder ao agente…"
+            className="max-h-40 min-h-6 flex-1 resize-none bg-transparent text-foreground outline-none placeholder:text-muted-foreground"
+            onChange={(e) => setReply(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                void send();
+              }
+            }}
+          />
+          {sending && <span className="pt-0.5 text-xs text-muted-foreground">✳</span>}
+        </div>
+        <p className="mt-2 text-xs text-muted-foreground">
+          enter enviar · shift+enter nova linha · poll 2s
+        </p>
       </div>
-    </main>
+    </TermScreen>
   );
 }
