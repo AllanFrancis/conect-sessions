@@ -1,7 +1,14 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { StatusDot, TermBox, TermHints, TermScreen } from "@/components/terminal";
+import {
+  StatusDot,
+  TermBox,
+  TermButton,
+  TermHints,
+  TermScreen,
+  termLinkClass,
+} from "@/components/terminal";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({
