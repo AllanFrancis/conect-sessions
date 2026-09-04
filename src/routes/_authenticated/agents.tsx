@@ -59,9 +59,9 @@ function AgentsPage() {
     queryClient.invalidateQueries({ queryKey: ["agents"] });
   }
 
-  // A URL de preview exige login no navegador (o curl recebe "Unauthorized").
-  // Use sempre a URL pública estável do projeto para o agente local.
-  const baseUrl = "https://project--6db84ef0-e8b7-4d09-8f52-05d7d24dd80a.lovable.app";
+  // A URL id-preview/lovableproject exige login no navegador e faz o curl
+  // baixar apenas "Unauthorized". A URL pública de desenvolvimento não tem esse gate.
+  const baseUrl = "https://project--6db84ef0-e8b7-4d09-8f52-05d7d24dd80a-dev.lovable.app";
 
   return (
     <TermScreen>
@@ -117,9 +117,8 @@ $env:LRC_TOKEN="${newToken}"
 node remote-agent.mjs`}
           </pre>
           <p className="text-xs text-muted-foreground">
-            ⚠ Use exatamente essa URL. A URL de preview pede login no navegador e o download
-            retorna “Unauthorized” (arquivo de 12 bytes). Publique o projeto uma vez para essa URL
-            ficar ativa.
+            ⚠ Use exatamente essa URL e mantenha o parâmetro -fL. URLs id-preview ou
+            lovableproject.com pedem login e baixam apenas “Unauthorized” (12 bytes).
           </p>
         </TermBox>
       )}
