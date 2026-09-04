@@ -59,7 +59,9 @@ function AgentsPage() {
     queryClient.invalidateQueries({ queryKey: ["agents"] });
   }
 
-  const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
+  // A URL de preview exige login no navegador (o curl recebe "Unauthorized").
+  // Use sempre a URL pública estável do projeto para o agente local.
+  const baseUrl = "https://project--6db84ef0-e8b7-4d09-8f52-05d7d24dd80a.lovable.app";
 
   return (
     <TermScreen>
