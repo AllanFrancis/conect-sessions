@@ -54,19 +54,21 @@ function Index() {
         </TermLine>
       </div>
 
-      <TermBox className="mt-5 flex items-center gap-2 px-3 py-2.5">
-        <span className="text-primary">&gt;</span>
-        <Link to="/auth" className="text-foreground hover:text-primary">
-          entrar no painel
+      <div className="mt-6 flex flex-wrap items-center gap-2">
+        <Link
+          to="/auth"
+          className="inline-flex items-center rounded-md border border-primary bg-primary px-4 py-2 text-xs text-primary-foreground transition-colors hover:bg-primary/90"
+        >
+          Entrar no painel
         </Link>
-        <span className="opacity-30">|</span>
-        <Link to="/dashboard" className="text-muted-foreground hover:text-primary">
-          ver sessões
+        <Link to="/dashboard" className={termLinkClass}>
+          Ver sessões
         </Link>
-      </TermBox>
-      <p className="mt-2 text-xs text-muted-foreground">
-        ? para ajuda · agente local em Node.js · sem instalar nada no editor
+      </div>
+      <p className="mt-3 text-xs text-muted-foreground">
+        agente local em Node.js · sem instalar nada no editor
       </p>
+
     </TermScreen>
   );
 }
