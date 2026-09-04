@@ -14,7 +14,162 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      agents: {
+        Row: {
+          created_at: string
+          id: string
+          last_seen_at: string | null
+          name: string
+          token_hash: string
+          token_prefix: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          last_seen_at?: string | null
+          name: string
+          token_hash: string
+          token_prefix: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          last_seen_at?: string | null
+          name?: string
+          token_hash?: string
+          token_prefix?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      messages: {
+        Row: {
+          content: string
+          created_at: string
+          external_id: string | null
+          id: string
+          role: string
+          seq: number | null
+          session_id: string
+          user_id: string
+        }
+        Insert: {
+          content?: string
+          created_at?: string
+          external_id?: string | null
+          id?: string
+          role?: string
+          seq?: number | null
+          session_id: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          external_id?: string | null
+          id?: string
+          role?: string
+          seq?: number | null
+          session_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      replies: {
+        Row: {
+          content: string
+          created_at: string
+          delivered_at: string | null
+          id: string
+          session_id: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          delivered_at?: string | null
+          id?: string
+          session_id: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          delivered_at?: string | null
+          id?: string
+          session_id?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "replies_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sessions: {
+        Row: {
+          agent_id: string
+          created_at: string
+          cwd: string | null
+          external_id: string
+          id: string
+          last_activity_at: string
+          source: string
+          status: string
+          title: string
+          user_id: string
+        }
+        Insert: {
+          agent_id: string
+          created_at?: string
+          cwd?: string | null
+          external_id: string
+          id?: string
+          last_activity_at?: string
+          source?: string
+          status?: string
+          title?: string
+          user_id: string
+        }
+        Update: {
+          agent_id?: string
+          created_at?: string
+          cwd?: string | null
+          external_id?: string
+          id?: string
+          last_activity_at?: string
+          source?: string
+          status?: string
+          title?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sessions_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
