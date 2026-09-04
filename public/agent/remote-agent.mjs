@@ -134,16 +134,21 @@ function readNew(file) {
 async function sync(file, messages, status) {
   const stat = fs.statSync(file);
   const project = projectOf(file);
+  const externalId = file.length > 200 ? file.slice(-200) : file;
   const body = {
     token: TOKEN,
     session: {
-      external_id: file,
+      external_id: externalId,
       source: sourceOf(file),
-      title: project.name,
-      cwd: project.cwd,
+      title: (project.name || "sessão").slice(0, 200),
+      cwd: (project.cwd || "").slice(0, 500) || null,
       status,
     },
-    messages,
+    messages: messages.slice(0, 200).map((m) => ({
+      ...m,
+      external_id: m.external_id ? String(m.external_id).slice(0, 200) : null,
+      role: String(m.role || "assistant").slice(0, 40),
+    })),
   };
   const res = await fetch(`${URL_BASE}/api/public/agent/sync`, {
     method: "POST",
@@ -177,8 +182,12 @@ async function tick() {
       const { messages } = readNew(file);
       const idleMs = Date.now() - fs.statSync(file).mtimeMs;
       const status = idleMs < 15000 ? "running" : idleMs < 5 * 60000 ? "waiting" : "idle";
-      if (messages.length > 0 || idleMs < 5 * 60000) {
-        await sync(file, messages, status);
+      if (messages.length > 0) {
+        for (let i = 0; i < messages.length; i += 200) {
+          await sync(file, messages.slice(i, i + 200), status);
+        }
+      } else if (idleMs < 5 * 60000) {
+        await sync(file, [], status);
       }
     } catch (err) {
       console.error("erro em", file, err.message);
