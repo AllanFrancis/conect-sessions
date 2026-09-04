@@ -1,7 +1,14 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { StatusDot, TermBox, TermHints, TermScreen } from "@/components/terminal";
+import {
+  StatusDot,
+  TermBox,
+  TermButton,
+  TermHints,
+  TermScreen,
+  termLinkClass,
+} from "@/components/terminal";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({
@@ -41,27 +48,27 @@ function Dashboard() {
       <TermBox tone="accent" className="px-4 py-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-primary">✻ Sessões ao vivo</p>
-          <div className="flex items-center gap-3 text-xs">
-            <Link to="/agents" className="text-muted-foreground hover:text-primary">
-              /agents
+          <div className="flex items-center gap-2">
+            <Link to="/agents" className={termLinkClass}>
+              Máquinas & tokens
             </Link>
-            <button
-              className="text-muted-foreground hover:text-primary"
+            <TermButton
+              variant="danger"
               onClick={async () => {
                 await supabase.auth.signOut();
                 navigate({ to: "/auth" });
               }}
             >
-              /exit
-            </button>
+              Sair
+            </TermButton>
           </div>
         </div>
         <p className="mt-1 text-xs text-muted-foreground">
-          poll 3s · {sessions.length} sessão(ões) conectada(s)
+          atualiza a cada 3s · {sessions.length} sessão(ões) conectada(s)
         </p>
       </TermBox>
 
-      <div className="mt-4 space-y-1">
+      <div className="mt-4 space-y-2">
         {isLoading ? (
           <p className="text-muted-foreground">✳ Carregando…</p>
         ) : sessions.length === 0 ? (
@@ -70,7 +77,7 @@ function Dashboard() {
             <p className="mt-1">
               Crie um token em{" "}
               <Link to="/agents" className="text-primary hover:underline">
-                /agents
+                Máquinas & tokens
               </Link>{" "}
               e rode o agente local na máquina do editor.
             </p>
@@ -81,24 +88,30 @@ function Dashboard() {
               key={s.id}
               to="/sessions/$sessionId"
               params={{ sessionId: s.id }}
-              className="block rounded px-2 py-1.5 hover:bg-accent/50"
+              className="block rounded-md border border-border bg-card px-3 py-2.5 transition-colors hover:border-primary/70"
             >
               <div className="flex items-baseline gap-2">
                 <StatusDot status={s.status} />
-                <span className="min-w-0 flex-1 truncate text-foreground">{s.title}</span>
+                <span className="min-w-0 flex-1 truncate font-medium text-foreground">
+                  {s.title}
+                </span>
+                <span className="shrink-0 rounded border border-border px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+                  {s.source}
+                </span>
                 <span className="shrink-0 text-xs text-muted-foreground">
                   {new Date(s.last_activity_at).toLocaleTimeString()}
                 </span>
               </div>
-              <p className="truncate pl-6 text-xs text-muted-foreground">
-                {s.source} · {s.cwd ?? "—"} · {s.status}
+              <p className="mt-0.5 truncate pl-6 text-xs text-muted-foreground">
+                {s.cwd ?? "—"} · {s.status} · abrir conversa →
               </p>
             </Link>
           ))
         )}
       </div>
 
-      <TermHints items={["enter para abrir", "/agents tokens", "/exit sair"]} />
+      <TermHints items={["clique numa sessão para abrir", "projeto = pasta lida pelo agente"]} />
     </TermScreen>
   );
 }
+

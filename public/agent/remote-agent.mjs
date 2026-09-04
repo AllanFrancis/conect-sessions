@@ -72,6 +72,22 @@ function sourceOf(file) {
   return "unknown";
 }
 
+/**
+ * Descobre o projeto ao qual a sessão pertence.
+ * Claude Code guarda em ~/.claude/projects/-Users-eu-code-meu-app/<uuid>.jsonl,
+ * então o nome da pasta é o caminho do projeto com "/" trocado por "-".
+ */
+function projectOf(file) {
+  const dir = path.dirname(file);
+  const folder = path.basename(dir);
+  if (sourceOf(file) === "claude-code" && folder.startsWith("-")) {
+    const decoded = folder.replace(/^-/, "/").replaceAll("-", "/");
+    return { name: path.basename(decoded) || folder, cwd: decoded };
+  }
+  return { name: folder, cwd: dir };
+}
+
+
 /** Extrai {role, content} de formatos comuns de log de sessão. */
 function normalize(obj) {
   if (!obj || typeof obj !== "object") return null;
@@ -117,13 +133,14 @@ function readNew(file) {
 
 async function sync(file, messages, status) {
   const stat = fs.statSync(file);
+  const project = projectOf(file);
   const body = {
     token: TOKEN,
     session: {
       external_id: file,
       source: sourceOf(file),
-      title: path.basename(file).replace(/\.(jsonl|json)$/i, ""),
-      cwd: path.dirname(file),
+      title: project.name,
+      cwd: project.cwd,
       status,
     },
     messages,
