@@ -2,6 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
+  SourceIcon,
   StatusDot,
   TermBox,
   TermButton,
@@ -9,6 +10,8 @@ import {
   TermScreen,
   termLinkClass,
 } from "@/components/terminal";
+import { projectName, sessionTitle } from "@/lib/session-display";
+
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({
@@ -30,18 +33,39 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
 function Dashboard() {
   const navigate = useNavigate();
 
-  const { data: sessions = [], isLoading } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ["sessions"],
     refetchInterval: 3000,
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data: rows, error } = await supabase
         .from("sessions")
         .select("id, title, source, status, cwd, last_activity_at")
         .order("last_activity_at", { ascending: false });
       if (error) throw error;
-      return data ?? [];
+      const sessions = rows ?? [];
+      const firstMessages: Record<string, string> = {};
+      if (sessions.length) {
+        const { data: msgs } = await supabase
+          .from("messages")
+          .select("session_id, content, created_at")
+          .in(
+            "session_id",
+            sessions.map((s) => s.id),
+          )
+          .eq("role", "user")
+          .order("created_at", { ascending: true })
+          .limit(500);
+        for (const m of msgs ?? []) {
+          if (!firstMessages[m.session_id]) firstMessages[m.session_id] = m.content;
+        }
+      }
+      return { sessions, firstMessages };
     },
   });
+
+  const sessions = data?.sessions ?? [];
+  const firstMessages = data?.firstMessages ?? {};
+
 
   return (
     <TermScreen>
@@ -90,21 +114,20 @@ function Dashboard() {
               params={{ sessionId: s.id }}
               className="block rounded-md border border-border bg-card px-3 py-2.5 transition-colors hover:border-primary/70"
             >
-              <div className="flex items-baseline gap-2">
+              <div className="flex items-center gap-2">
                 <StatusDot status={s.status} />
+                <SourceIcon source={s.source} />
                 <span className="min-w-0 flex-1 truncate font-medium text-foreground">
-                  {s.title}
-                </span>
-                <span className="shrink-0 rounded border border-border px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
-                  {s.source}
+                  {sessionTitle(s.title, firstMessages[s.id], s.cwd)}
                 </span>
                 <span className="shrink-0 text-xs text-muted-foreground">
                   {new Date(s.last_activity_at).toLocaleTimeString()}
                 </span>
               </div>
-              <p className="mt-0.5 truncate pl-6 text-xs text-muted-foreground">
-                {s.cwd ?? "—"} · {s.status} · abrir conversa →
+              <p className="mt-0.5 truncate pl-[3.25rem] text-xs text-muted-foreground">
+                {projectName(s.cwd, s.title)} · {s.status} · abrir conversa →
               </p>
+
             </Link>
           ))
         )}

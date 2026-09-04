@@ -3,7 +3,15 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import { supabase } from "@/integrations/supabase/client";
-import { StatusDot, TermBox, TermButton, TermScreen, termLinkClass } from "@/components/terminal";
+import {
+  SourceIcon,
+  StatusDot,
+  TermBox,
+  TermButton,
+  TermScreen,
+  termLinkClass,
+} from "@/components/terminal";
+import { projectName, sessionTitle } from "@/lib/session-display";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/sessions/$sessionId")({
@@ -93,14 +101,23 @@ function SessionPage() {
     <TermScreen className="flex min-h-screen flex-col">
       <TermBox tone="accent" className="px-4 py-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="min-w-0 truncate text-primary">✻ {session?.title ?? "Sessão"}</p>
+          <p className="flex min-w-0 items-center gap-2 truncate text-primary">
+            <SourceIcon source={session?.source} />
+            <span className="truncate">
+              {sessionTitle(
+                session?.title,
+                data?.messages.find((m) => m.role === "user")?.content,
+                session?.cwd,
+              )}
+            </span>
+          </p>
           <Link to="/dashboard" className={termLinkClass}>
             ← Sessões
           </Link>
         </div>
         <p className="mt-1 flex items-center gap-2 truncate text-xs text-muted-foreground">
           <StatusDot status={session?.status ?? "idle"} />
-          {session?.status ?? "…"} · {session?.source} · {session?.cwd ?? "—"}
+          {session?.status ?? "…"} · {projectName(session?.cwd, session?.title)}
         </p>
       </TermBox>
 
@@ -115,7 +132,7 @@ function SessionPage() {
           ) : (
             <div key={m.id} className="flex gap-2">
               <span className="select-none text-primary">⏺</span>
-              <div className="prose prose-sm min-w-0 max-w-none flex-1 text-muted-foreground dark:prose-invert prose-p:my-1 prose-pre:bg-card prose-pre:text-xs">
+              <div className="prose prose-sm min-w-0 max-w-none flex-1 text-muted-foreground prose-p:my-1 prose-pre:bg-card prose-pre:text-xs">
                 <ReactMarkdown>{m.content}</ReactMarkdown>
               </div>
             </div>

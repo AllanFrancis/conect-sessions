@@ -125,3 +125,45 @@ export function TermHints({ items }: { items: string[] }) {
   );
 }
 
+
+/** Marca visual de cada origem (no lugar do nome "kiro"/"claude-code"). */
+export function SourceIcon({
+  source,
+  className,
+}: {
+  source?: string | null | undefined;
+  className?: string | undefined;
+}) {
+  const key = (source ?? "").toLowerCase();
+  const label = key === "claude-code" ? "Claude Code" : key === "kiro" ? "Kiro" : source || "agente";
+  return (
+    <span
+      title={label}
+      aria-label={label}
+      className={cn(
+        "inline-flex size-5 shrink-0 items-center justify-center rounded-[5px] border border-border bg-secondary",
+        className,
+      )}
+    >
+      {key === "claude-code" ? (
+        <svg viewBox="0 0 24 24" className="size-3.5 text-primary" aria-hidden="true">
+          <g stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+            <path d="M12 3v18M4.2 7.5l15.6 9M19.8 7.5l-15.6 9" />
+          </g>
+        </svg>
+      ) : key === "kiro" ? (
+        <svg viewBox="0 0 24 24" className="size-3.5 text-foreground" aria-hidden="true">
+          <path
+            d="M6 20V9a6 6 0 1 1 12 0v11l-3-2-3 2-3-2-3 2Z"
+            fill="currentColor"
+            opacity="0.9"
+          />
+          <circle cx="9.6" cy="10" r="1.15" className="fill-secondary" />
+          <circle cx="14.4" cy="10" r="1.15" className="fill-secondary" />
+        </svg>
+      ) : (
+        <span className="text-[10px] text-muted-foreground">◆</span>
+      )}
+    </span>
+  );
+}
