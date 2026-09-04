@@ -35,11 +35,14 @@ if (!URL_BASE || !TOKEN) {
 }
 
 const HOME = os.homedir();
+const APP_DATA = process.env.APPDATA || path.join(HOME, "AppData", "Roaming");
 const DEFAULT_DIRS = [
   path.join(HOME, ".claude", "projects"), // Claude Code
-  path.join(HOME, ".kiro", "sessions"), // Kiro
+  path.join(HOME, ".kiro", "sessions"), // Kiro CLI
+  path.join(HOME, ".kiro", "sessions", "cli"),
   path.join(HOME, ".kiro", "chats"),
   path.join(HOME, ".config", "kiro", "sessions"),
+  path.join(APP_DATA, "Kiro", "User", "globalStorage", "kiro.kiroagent", "workspace-sessions"), // Kiro IDE
 ];
 const EXTRA_DIRS = (process.env.LRC_WATCH || "")
   .split(",")
@@ -66,7 +69,7 @@ function walk(dir, out = []) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) walk(full, out);
-    else if (/\.(jsonl|json)$/i.test(entry.name)) out.push(full);
+    else if (/\.(jsonl|json|chat)$/i.test(entry.name)) out.push(full);
   }
   return out;
 }
@@ -115,6 +118,34 @@ function normalize(obj) {
 
 function readNew(file) {
   const raw = fs.readFileSync(file, "utf8");
+  if (/\.(json|chat)$/i.test(file)) {
+    let parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      return { messages: [], isFirstRun: !sent.has(file), total: 0 };
+    }
+    const candidates = Array.isArray(parsed)
+      ? parsed
+      : parsed.messages ??
+        parsed.events ??
+        parsed.history ??
+        parsed.conversation?.messages ??
+        parsed.chat?.messages ??
+        [parsed];
+    const items = Array.isArray(candidates) ? candidates : [candidates];
+    const start = sent.get(file) ?? 0;
+    const messages = items
+      .slice(start)
+      .map((item, i) => {
+        const message = normalize(item);
+        return message ? { ...message, seq: start + i } : null;
+      })
+      .filter(Boolean);
+    sent.set(file, items.length);
+    return { messages, isFirstRun: start === 0, total: items.length };
+  }
+
   const lines = raw.split("\n").filter((l) => l.trim());
   const start = sent.get(file) ?? 0;
   const fresh = lines.slice(start);
