@@ -1,0 +1,140 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Commands
+
+Package manager is **bun** (`bun.lock`, `bunfig.toml`). npm also works.
+
+```sh
+bun install
+bun run dev          # vite dev server
+bun run build        # production build (nitro, cloudflare target)
+bun run build:dev    # build with development mode env
+bun run preview
+bun run lint         # eslint (prettier runs as an eslint rule)
+bun run format       # prettier --write .
+bunx tsc --noEmit    # typecheck — there is no typecheck script
+```
+
+There is no test runner configured in this project.
+
+`bunfig.toml` sets `minimumReleaseAge = 86400` (24h supply-chain guard). Adding a package to
+`minimumReleaseAgeExcludes` requires confirming with the user first.
+
+## What this app is
+
+"Remote Session Monitor" — watch and reply to AI coding sessions (Claude Code, Kiro) running on
+your own machines, from a phone or browser. UI copy is Brazilian Portuguese.
+
+Three tiers:
+
+1. **Local agent** — [public/agent/remote-agent.mjs](public/agent/remote-agent.mjs), a
+   dependency-free Node script the user runs on their editor machine. It walks
+   `~/.claude/projects`, `~/.kiro/...` (plus `LRC_WATCH` dirs), tails `.jsonl`/`.json`/`.chat`
+   session logs, normalizes heterogeneous message shapes, and POSTs new lines every `LRC_INTERVAL`
+   ms. Derives session `status` from file mtime (`<15s` running, `<5min` waiting, else idle) and
+   the project `cwd` by decoding Claude Code's `-Users-me-code-app` folder-name encoding.
+   Configured entirely by env: `LRC_URL`, `LRC_TOKEN`, `LRC_INTERVAL`, `LRC_WATCH`,
+   `LRC_REPLY_CMD`, `LRC_REPLY_FILE`.
+2. **Public sync API** — [src/routes/api/public/agent/sync.ts](src/routes/api/public/agent/sync.ts).
+   Unauthenticated + CORS `*`; authenticated only by the agent token in the JSON body. Upserts the
+   session on `(agent_id, external_id)`, inserts messages, and returns pending `replies` in the
+   same response while flipping them to `delivered`. This one round-trip *is* the whole
+   bidirectional protocol — there is no websocket or push channel.
+3. **Dashboard** — `_authenticated` routes querying Supabase directly from the browser under RLS.
+   Freshness comes from react-query `refetchInterval` polling (3s on the dashboard, 2s in a
+   session), **not** Supabase Realtime. Keep it that way unless deliberately migrating.
+
+The reply loop closes on the agent side: the dashboard inserts a row into `replies`, the agent
+receives it on its next sync and appends it to `LRC_REPLY_FILE` and/or runs `LRC_REPLY_CMD` with
+`{{reply}}`/`{{session}}` substituted.
+
+[src/routes/api/public/agent/remote-agent.ts](src/routes/api/public/agent/remote-agent.ts) serves
+the agent script via a `?raw` import rather than from `public/`, because `public/` sits behind the
+Lovable preview auth gate and `curl` would otherwise download "Unauthorized".
+
+## Stack and framework rules
+
+TanStack Start 1.x + React 19 + Vite 8 + Tailwind v4 + shadcn/ui (new-york) + Supabase.
+
+- **Routing is file-based** under [src/routes/](src/routes/) — see
+  [src/routes/README.md](src/routes/README.md) for the conventions. `src/routeTree.gen.ts` is
+  generated; never hand-edit. No `src/pages/`, no `app/layout.tsx`.
+- **`vite.config.ts` must stay minimal.** `@lovable.dev/vite-tanstack-config` already bundles
+  tanstackStart, viteReact, tailwindcss, tsConfigPaths, nitro, devtools, the `@` alias, and env
+  injection. Re-adding any of them duplicates plugins and breaks the app.
+- [src/server.ts](src/server.ts) is the SSR entry (wired via `tanstackStart.server.entry`). It
+  exists to un-swallow h3 errors: h3 turns in-handler throws into a plain 500 JSON body
+  `{"unhandled":true,"message":"HTTPError"}` that `try/catch` never sees, so the entry sniffs for
+  that shape and re-renders a real error page.
+- [src/start.ts](src/start.ts) registers global middleware. Defining this file opts out of
+  TanStack Start's automatic CSRF middleware, which is why `createCsrfMiddleware` is re-added
+  explicitly — don't remove it.
+- Never import the `server-only` package (eslint blocks it). Use a `*.server.ts` filename or
+  `@tanstack/react-start/server-only`.
+- tsconfig is aggressively strict (`noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`,
+  `noPropertyAccessFromIndexSignature`). Consequence you will hit immediately: env vars must be
+  read with bracket notation — `process.env['SUPABASE_URL']`, `import.meta.env['VITE_...']`.
+
+## Auth and Supabase clients
+
+Three clients, three different trust levels — pick deliberately:
+
+| Module | Key | Use |
+| --- | --- | --- |
+| [client.ts](src/integrations/supabase/client.ts) `supabase` | publishable | browser + SSR reads, RLS applies |
+| [auth-middleware.ts](src/integrations/supabase/auth-middleware.ts) `requireSupabaseAuth` | user's bearer token | server functions; gives `context.supabase` (RLS as that user), `context.userId`, `context.claims` |
+| [client.server.ts](src/integrations/supabase/client.server.ts) `supabaseAdmin` | service role | **bypasses RLS**; server handlers only |
+
+- Every new `createServerFn` needs `.middleware([requireSupabaseAuth])` and should write through
+  `context.supabase` with `context.userId` — see
+  [src/lib/agents.functions.ts](src/lib/agents.functions.ts) for the pattern.
+- `supabaseAdmin` must be **dynamically imported inside the handler**
+  (`const { supabaseAdmin } = await import("@/integrations/supabase/client.server")`). Route files
+  and `*.functions.ts` ship to the client bundle, so a top-level import leaks the service-role key.
+  Only other `.server.ts` modules may import it at the top level.
+- The client bearer token reaches server functions only because `attachSupabaseAuth` is registered
+  as a global `functionMiddleware` in `src/start.ts`.
+- Everything in [src/integrations/](src/integrations/) carries an "automatically generated, do not
+  edit" header (Lovable regenerates them) — including `supabase/types.ts`, the DB types.
+
+## Agent tokens
+
+Tokens are `lrc_<48 hex>`, returned to the UI exactly once at creation. The DB stores only
+`token_hash` (sha256 hex) and a `token_prefix` for display. The sync route authenticates by hashing
+the submitted token and looking up `token_hash`. There is no way to recover a lost token — the user
+creates a new agent.
+
+[src/routes/_authenticated/agents.tsx](src/routes/_authenticated/agents.tsx) hard-codes the
+project's `-dev.lovable.app` base URL into the copy-paste install snippet, deliberately: the
+`id-preview`/`lovableproject.com` hosts require a browser login and would make `curl` download a
+12-byte "Unauthorized" instead of the script. Update it if the project URL changes.
+
+## Database
+
+Schema lives in [supabase/migrations/](supabase/migrations/); project ref in
+`supabase/config.toml`. Tables: `agents` → `sessions` → (`messages`, `replies`), all cascading on
+delete. Every table has RLS with a single `auth.uid() = user_id` policy for `authenticated` plus
+full `service_role` grants, and every row carries a denormalized `user_id` (the sync route copies
+it from the agent) so the policies work without joins. Preserve that when adding tables.
+
+## UI conventions
+
+- The terminal aesthetic is expressed through the primitives in
+  [src/components/terminal.tsx](src/components/terminal.tsx) (`TermScreen`, `TermBox`, `TermLine`,
+  `TermButton`, `TermHints`, `StatusDot`, `SourceIcon`, `termLinkClass`). Compose these rather than
+  re-styling raw divs; `src/components/ui/` is stock shadcn and is generally left alone.
+- Tailwind v4 is CSS-first: the design system lives in [src/styles.css](src/styles.css) — add a
+  color to both `:root` and `.dark`, then register it in `@theme inline`. **All colors must be
+  oklch.** Use semantic tokens (`text-foreground`, `border-primary/70`), not raw palette classes.
+- Session titles are frequently uuids/hashes. Always render them through `sessionTitle()` /
+  `projectName()` from [src/lib/session-display.ts](src/lib/session-display.ts), which fall back to
+  the first user message and the cwd's last path segment.
+
+## Lovable sync
+
+This repo is connected to Lovable, and pushes to `main` sync back into the editor (see
+[AGENTS.md](AGENTS.md)). Do not force-push, rebase, amend, or squash already-pushed commits — that
+rewrites history on Lovable's side and the user loses project history. Keep `main` in a working
+state.

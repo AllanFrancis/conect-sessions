@@ -1,4 +1,4 @@
-# AGENTS.md — Remote Session Monitor
+# CLAUDE.md — Remote Session Monitor
 
 > Regra dura de posicionamento: este bloco imperativo fica SEMPRE no TOPO, antes de qualquer outra seção. `specctl entrypoints` garante isso em regeneração/merge.
 
@@ -10,13 +10,7 @@
 4. **Temporários na pasta da SPEC** — `tmp/` (descartável) ou `evidence/` (persistente); sem SPEC → `.scratch/`. Nunca na raiz.
 5. **PROIBIDO varrer `scripts/specctl.mjs` ou re-ler `docs/rules/*` só para "garantir compliance"** — os gates dizem o que falta (`close <id> --dry`). Ler a rule DA TAREFA no momento do uso é o caminho certo, não viola este ban.
 
-**R.9 — 1ª linha de TODA resposta = classificação:** `[continuidade: SPEC-x]` (trabalho de SPEC existente) | `[nova]` (demanda que muda comportamento/código do produto → exige SPEC) | `[livre]` (pergunta, análise, leitura, config de ferramenta, bump de harness — nada que altere o produto; sem SPEC). Ambíguo? PERGUNTE.
-
-## Sem hooks? (CLIs sem suporte)
-
-- Início de CADA sessão: rode `node scripts/specctl.mjs brief` e cole o output.
-- Gatilhos `/spec`: "inicie uma spec: <demanda>" · "feche a spec" · "status das specs" · "pause/retome a SPEC-x".
-- Antes do PR: `specctl lint` e `audit`. O CI (docs-gate) é o piso universal.
+**R.9 — 1ª linha de TODA resposta = classificação:** `[continuidade: SPEC-x]` (trabalho de SPEC existente) | `[nova]` (demanda que muda comportamento/código do produto → exige SPEC) | `[livre]` (pergunta, análise, leitura, config de ferramenta, bump de harness — nada que altere o produto; sem SPEC). Ambíguo? PERGUNTE. `/spec` abre os fluxos guiados.
 
 ## Estrutura docs/
 
@@ -33,7 +27,7 @@
 - lint: `bun run lint`
 - dev: `bun run dev`
 
-Labels `test/typecheck/lint/dev/e2e` espelhados em `docs/.spec-system.json` — CI e `verify:` consomem de lá; não hardcode.
+Labels `test/typecheck/lint/dev/e2e` espelhados em `docs/.spec-system.json` — hooks, CI e `verify:` consomem de lá; não hardcode.
 
 ## Skills e quando disparar
 
@@ -51,22 +45,23 @@ Labels `test/typecheck/lint/dev/e2e` espelhados em `docs/.spec-system.json` — 
 <!-- projeto:início -->
 ## Projeto — Remote Session Monitor
 
-Monitorar e responder sessões de IA (Claude Code, Kiro) rodando nas suas máquinas, pelo celular ou navegador. UI em português do Brasil.
+Monitorar e responder sessões de IA (Claude Code, Kiro) rodando nas suas máquinas, pelo celular ou navegador. UI em pt-BR.
 
-**Stack:** TanStack Start 1.x + React 19 + TypeScript + Vite 8 + Tailwind v4 + shadcn/ui (new-york) + Supabase + Nitro (Cloudflare) · gerenciador: bun
+**Stack:** TanStack Start 1.x + React 19 + TS + Vite 8 + Tailwind v4 + shadcn/ui (new-york) + Supabase + Nitro/Cloudflare · bun (`bun install`, `bun run dev|build|lint|format`, `bunx tsc --noEmit`). Sem test runner. `bunfig.toml` tem `minimumReleaseAge=86400` — excluir pacote exige confirmar com o usuário.
 
-<!-- LOVABLE:BEGIN -->
-> [!IMPORTANT]
-> This project is connected to [Lovable](https://lovable.dev). Avoid rewriting
-> published git history — force pushing, or rebasing/amending/squashing commits
-> that are already pushed — as it rewrites history on Lovable's side and the
-> user will likely lose their project history.
->
-> Commits you push to the connected branch sync back to Lovable and show up in
-> the editor, so keep the branch in a working state.
-<!-- LOVABLE:END -->
+**Três camadas:** agente local `public/agent/remote-agent.mjs` (Node puro, tail de logs de sessão, config só por env `LRC_*`) → API pública `src/routes/api/public/agent/sync.ts` (CORS `*`, autenticada pelo token do agente no body, devolve `replies` pendentes no mesmo round-trip — este round-trip É o protocolo; não há websocket) → dashboard `_authenticated/*` lendo Supabase no browser sob RLS, com polling react-query (3s/2s), **não** Realtime.
 
-Convenções completas do projeto (comandos, arquitetura, Supabase, UI): bloco projeto do `CLAUDE.md`.
+**Regras duras do projeto:**
+- `vite.config.ts` fica mínimo — `@lovable.dev/vite-tanstack-config` já traz tanstackStart/react/tailwind/tsConfigPaths/nitro/devtools/alias.
+- `supabaseAdmin` (service role) só por `await import(...)` DENTRO do handler; top-level apenas em outros `*.server.ts`.
+- Todo `createServerFn` novo: `.middleware([requireSupabaseAuth])`, escrevendo por `context.supabase`/`context.userId`.
+- tsconfig estrito: env por bracket notation (`process.env['X']`). Nunca importar `server-only` — use `*.server.ts`.
+- `src/routeTree.gen.ts` e `src/integrations/**` são gerados — não editar à mão.
+- Tabela nova: RLS `auth.uid() = user_id` + `user_id` denormalizado; migrations em `supabase/migrations/`.
+- UI: compor as primitivas de `src/components/terminal.tsx`; cores só oklch em `src/styles.css` (`:root` + `.dark` + `@theme inline`); títulos por `sessionTitle()`/`projectName()`.
+- Lovable sincroniza `main`: nunca force-push/rebase/amend/squash de commit já publicado.
+
+Notas longas preservadas em `CLAUDE.md.pre-spec.bak` (destino: `docs/features/*` no bootstrap brownfield).
 <!-- projeto:fim -->
 
 ---
