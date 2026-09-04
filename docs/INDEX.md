@@ -2,4 +2,6 @@
 
 > GERADO — specctl index — NÃO EDITAR
 
-_Sem features ainda._
+## geral
+
+- **dashboard** — painel, sessões, polling, react-query, status, resposta remota

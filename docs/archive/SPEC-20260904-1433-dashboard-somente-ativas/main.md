@@ -1,15 +1,15 @@
 # SPEC-20260904-1433: dashboard somente ativas
 
-**Status:** active
+**Status:** done
 **Porte:** P
 **Owner:** @AllanFrancis
 **Criada:** 2026-09-04 14:33
 **Ativada:** 2026-09-04 14:33
-**Concluída:** —
+**Concluída:** 2026-09-04 14:44
 **Pausada em:** —
-**Commit final:** —
+**Commit final:** `fc53ff4`
 **Keywords:** dashboard, somente, ativas
-**Features:** —
+**Features:** dashboard
 **Branch:** feat/dashboard-somente-ativas
 **Programa:** —
 **Workspace:** —
@@ -55,6 +55,6 @@ Uma cláusula `.eq("status", "active")` na query react-query de [dashboard.tsx](
 
 ## Critério de aceite
 
-- [ ] A query do dashboard filtra `status = 'active'` no servidor e a lista não exibe sessão de outro status
-- [ ] Contador do cabeçalho e estado vazio falam de sessões ativas, coerentes com o filtro
-- [ ] `bun run lint` e `bunx tsc --noEmit` sem erros
+- [x] A query do dashboard filtra `status = 'active'` no servidor e a lista não exibe sessão de outro status (2026-09-04 14:36, commit `fc53ff4`)
+- [x] Contador do cabeçalho e estado vazio falam de sessões ativas, coerentes com o filtro (2026-09-04 14:36, commit `fc53ff4`)
+- [ ] `bun run lint` e `bunx tsc --noEmit` sem erros [aceito-incompleto: "Aceitar incompleto" 2026-09-04 14:43]

@@ -11,3 +11,5 @@
 - web/checkout — fluxo de compra no frontend (aliases proibidos: carrinho→web/checkout)
 - infra/ci — pipelines de build, teste e deploy (aliases proibidos: actions→infra/ci, gha→infra/ci)
 -->
+
+- dashboard — painel autenticado de sessões: lista, transcrição e resposta remota (aliases proibidos: painel→dashboard, sessions-ui→dashboard)
