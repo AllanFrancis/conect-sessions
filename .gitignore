@@ -36,3 +36,6 @@ docs/active/**/tmp/
 # Supabase CLI: cache de link (contem refs, nao versionar)
 supabase/.temp/
 supabase/.branches/
+
+# Variaveis de ambiente: contem service-role key, nunca versionar
+.env

@@ -1,16 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { createAgent } from "@/lib/agents.functions";
-import {
-  TermBox,
-  TermButton,
-  TermHints,
-  TermScreen,
-  termLinkClass,
-} from "@/components/terminal";
+import { TermBox, TermButton, TermHints, TermScreen, termLinkClass } from "@/components/terminal";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/agents")({
@@ -65,9 +59,11 @@ function AgentsPage() {
     queryClient.invalidateQueries({ queryKey: ["agents"] });
   }
 
-  // A URL id-preview/lovableproject exige login no navegador e faz o curl
-  // baixar apenas "Unauthorized". A URL pública de desenvolvimento não tem esse gate.
-  const baseUrl = "https://project--6db84ef0-e8b7-4d09-8f52-05d7d24dd80a-dev.lovable.app";
+  // A URL do snippet tem que ser a do app que EMITIU o token: o agente
+  // autentica contra o banco daquele deploy. Uma URL fixa fazia o token criado
+  // num ambiente ser enviado para outro, resultando em 401 "Token invalido".
+  const [baseUrl, setBaseUrl] = useState("");
+  useEffect(() => setBaseUrl(window.location.origin), []);
 
   return (
     <TermScreen>
@@ -101,7 +97,6 @@ function AgentsPage() {
         </TermButton>
       </div>
 
-
       {newToken && (
         <TermBox tone="accent" className="mt-4 space-y-3 px-4 py-3">
           <p className="text-primary">⏺ Token criado — copie agora, não será exibido novamente</p>
@@ -123,8 +118,8 @@ $env:LRC_TOKEN="${newToken}"
 node remote-agent.mjs`}
           </pre>
           <p className="text-xs text-muted-foreground">
-            ⚠ Use exatamente essa URL e mantenha o parâmetro -fL. URLs id-preview ou
-            lovableproject.com pedem login e baixam apenas “Unauthorized” (12 bytes).
+            ⚠ O token vale só para este endereço ({baseUrl || "esta URL"}), porque é nele que ele
+            foi gravado. Mantenha o -fL.
           </p>
         </TermBox>
       )}
@@ -156,7 +151,6 @@ node remote-agent.mjs`}
       </div>
 
       <TermHints items={["o token só aparece uma vez", "rode o agente na máquina do editor"]} />
-
     </TermScreen>
   );
 }
