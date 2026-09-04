@@ -4,9 +4,7 @@ import { useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { createAgent } from "@/lib/agents.functions";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { TermBox, TermHints, TermScreen } from "@/components/terminal";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/agents")({
@@ -64,73 +62,87 @@ function AgentsPage() {
   const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
 
   return (
-    <main className="mx-auto max-w-3xl px-4 py-10">
-      <Link to="/dashboard" className="text-xs text-muted-foreground hover:underline">
-        ← Sessões
-      </Link>
-      <h1 className="mb-6 mt-2 text-2xl font-semibold">Máquinas & tokens</h1>
+    <TermScreen>
+      <TermBox tone="accent" className="px-4 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-primary">✻ Máquinas & tokens</p>
+          <Link to="/dashboard" className="text-xs text-muted-foreground hover:text-primary">
+            /sessions
+          </Link>
+        </div>
+        <p className="mt-1 text-xs text-muted-foreground">
+          cada máquina (notebook, desktop, servidor) recebe um token próprio
+        </p>
+      </TermBox>
 
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>Nova máquina</CardTitle>
-          <CardDescription>
-            Cada máquina (notebook, desktop, servidor) recebe um token próprio.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex gap-2">
-          <Input
-            placeholder="Ex.: MacBook trabalho"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
-          <Button onClick={() => void add()}>Gerar token</Button>
-        </CardContent>
-      </Card>
+      <div className="mt-4 flex items-center gap-2 rounded-md border border-border px-3 py-2 focus-within:border-primary/70">
+        <span className="select-none text-primary">&gt;</span>
+        <input
+          value={name}
+          placeholder="nome da máquina, ex.: MacBook trabalho"
+          className="flex-1 bg-transparent text-foreground outline-none placeholder:text-muted-foreground"
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") void add();
+          }}
+        />
+        <button
+          onClick={() => void add()}
+          className="shrink-0 text-xs text-muted-foreground hover:text-primary"
+        >
+          enter ⏎
+        </button>
+      </div>
 
       {newToken && (
-        <Card className="mb-6 border-primary">
-          <CardHeader>
-            <CardTitle>Token criado</CardTitle>
-            <CardDescription>Copie agora — ele não será exibido novamente.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <code className="block break-all rounded bg-muted p-3 text-xs">{newToken}</code>
-            <p className="text-sm text-muted-foreground">
-              Na máquina onde o editor roda (macOS / Linux):
-            </p>
-            <pre className="overflow-x-auto rounded bg-muted p-3 text-xs">
-              {`curl -o remote-agent.mjs ${baseUrl}/api/public/agent/remote-agent
+        <TermBox tone="accent" className="mt-4 space-y-3 px-4 py-3">
+          <p className="text-primary">⏺ Token criado — copie agora, não será exibido novamente</p>
+          <pre className="overflow-x-auto whitespace-pre-wrap break-all rounded bg-card p-3 text-xs text-foreground">
+            {newToken}
+          </pre>
+          <p className="text-xs text-muted-foreground">macOS / Linux:</p>
+          <pre className="overflow-x-auto rounded bg-card p-3 text-xs text-muted-foreground">
+            {`curl -o remote-agent.mjs ${baseUrl}/api/public/agent/remote-agent
 LRC_URL=${baseUrl} LRC_TOKEN=${newToken} node remote-agent.mjs`}
-            </pre>
-            <p className="text-sm text-muted-foreground">Windows (PowerShell):</p>
-            <pre className="overflow-x-auto rounded bg-muted p-3 text-xs">
-              {`curl.exe -o remote-agent.mjs ${baseUrl}/api/public/agent/remote-agent
+          </pre>
+          <p className="text-xs text-muted-foreground">Windows (PowerShell):</p>
+          <pre className="overflow-x-auto rounded bg-card p-3 text-xs text-muted-foreground">
+            {`curl.exe -o remote-agent.mjs ${baseUrl}/api/public/agent/remote-agent
 $env:LRC_URL="${baseUrl}"; $env:LRC_TOKEN="${newToken}"; node remote-agent.mjs`}
-            </pre>
-          </CardContent>
-        </Card>
+          </pre>
+        </TermBox>
       )}
 
-      <div className="space-y-2">
+      <div className="mt-4 space-y-1">
+        {agents.length === 0 && (
+          <p className="text-muted-foreground">Nenhuma máquina cadastrada ainda.</p>
+        )}
         {agents.map((a) => (
-          <Card key={a.id}>
-            <CardContent className="flex items-center justify-between gap-3 py-4">
-              <div>
-                <p className="font-medium">{a.name}</p>
-                <p className="text-xs text-muted-foreground">
-                  {a.token_prefix}… ·{" "}
-                  {a.last_seen_at
-                    ? `visto em ${new Date(a.last_seen_at).toLocaleString()}`
-                    : "nunca conectou"}
-                </p>
-              </div>
-              <Button variant="ghost" size="sm" onClick={() => void remove(a.id)}>
-                Remover
-              </Button>
-            </CardContent>
-          </Card>
+          <div
+            key={a.id}
+            className="group flex items-baseline gap-2 rounded px-2 py-1.5 hover:bg-accent/50"
+          >
+            <span className="select-none text-primary">⏺</span>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-foreground">{a.name}</p>
+              <p className="truncate text-xs text-muted-foreground">
+                {a.token_prefix}… ·{" "}
+                {a.last_seen_at
+                  ? `visto em ${new Date(a.last_seen_at).toLocaleString()}`
+                  : "nunca conectou"}
+              </p>
+            </div>
+            <button
+              onClick={() => void remove(a.id)}
+              className="shrink-0 text-xs text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
+            >
+              remover
+            </button>
+          </div>
         ))}
       </div>
-    </main>
+
+      <TermHints items={["enter cria token", "token só aparece uma vez", "/sessions voltar"]} />
+    </TermScreen>
   );
 }

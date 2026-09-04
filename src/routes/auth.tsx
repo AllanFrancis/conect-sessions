@@ -2,10 +2,7 @@ import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { TermBox, TermScreen } from "@/components/terminal";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/auth")({
@@ -79,57 +76,66 @@ function AuthPage() {
     navigate({ to: "/dashboard" });
   }
 
+  const fieldClass =
+    "flex items-center gap-2 rounded-md border border-border px-3 py-2 focus-within:border-primary/70";
+
   return (
-    <main className="flex min-h-screen items-center justify-center bg-background px-4">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle>{mode === "signin" ? "Entrar" : "Criar conta"}</CardTitle>
-          <CardDescription>
-            Painel remoto das suas sessões de chat de IA (Claude Code, Kiro e outros).
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <form onSubmit={submit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">E-mail</Label>
-              <Input
-                id="email"
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Senha</Label>
-              <Input
-                id="password"
-                type="password"
-                required
-                minLength={6}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-            </div>
-            <Button type="submit" className="w-full" disabled={loading}>
-              {mode === "signin" ? "Entrar" : "Criar conta"}
-            </Button>
-          </form>
-          <Button variant="outline" className="w-full" onClick={google}>
-            Continuar com Google
-          </Button>
-          <button
-            type="button"
-            className="w-full text-sm text-muted-foreground hover:text-foreground"
-            onClick={() => setMode(mode === "signin" ? "signup" : "signin")}
-          >
-            {mode === "signin" ? "Não tem conta? Criar conta" : "Já tem conta? Entrar"}
-          </button>
-          <Link to="/" className="block text-center text-sm text-muted-foreground hover:underline">
-            Voltar
-          </Link>
-        </CardContent>
-      </Card>
-    </main>
+    <TermScreen className="flex min-h-screen max-w-xl flex-col justify-center">
+      <TermBox tone="accent" className="px-4 py-3">
+        <p className="text-primary">✻ {mode === "signin" ? "Entrar" : "Criar conta"}</p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          painel remoto das suas sessões de chat de IA
+        </p>
+      </TermBox>
+
+      <form onSubmit={submit} className="mt-4 space-y-2">
+        <div className={fieldClass}>
+          <span className="select-none text-muted-foreground">email</span>
+          <input
+            type="email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="flex-1 bg-transparent text-foreground outline-none"
+          />
+        </div>
+        <div className={fieldClass}>
+          <span className="select-none text-muted-foreground">senha</span>
+          <input
+            type="password"
+            required
+            minLength={6}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="flex-1 bg-transparent text-foreground outline-none"
+          />
+        </div>
+        <button
+          type="submit"
+          disabled={loading}
+          className="flex w-full items-center gap-2 rounded-md border border-primary/70 px-3 py-2 text-left text-foreground hover:bg-accent/50 disabled:opacity-50"
+        >
+          <span className="text-primary">&gt;</span>
+          {loading ? "✳ autenticando…" : mode === "signin" ? "entrar" : "criar conta"}
+        </button>
+      </form>
+
+      <button
+        onClick={google}
+        className="mt-2 flex w-full items-center gap-2 rounded-md border border-border px-3 py-2 text-left text-muted-foreground hover:text-foreground"
+      >
+        <span className="text-primary">&gt;</span> continuar com Google
+      </button>
+
+      <div className="mt-3 flex items-center gap-3 text-xs text-muted-foreground">
+        <button type="button" onClick={() => setMode(mode === "signin" ? "signup" : "signin")}>
+          {mode === "signin" ? "/signup criar conta" : "/signin já tenho conta"}
+        </button>
+        <span className="opacity-30">·</span>
+        <Link to="/" className="hover:text-primary">
+          /home
+        </Link>
+      </div>
+    </TermScreen>
   );
 }
