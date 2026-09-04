@@ -133,13 +133,14 @@ function readNew(file) {
 
 async function sync(file, messages, status) {
   const stat = fs.statSync(file);
+  const project = projectOf(file);
   const body = {
     token: TOKEN,
     session: {
       external_id: file,
       source: sourceOf(file),
-      title: path.basename(file).replace(/\.(jsonl|json)$/i, ""),
-      cwd: path.dirname(file),
+      title: project.name,
+      cwd: project.cwd,
       status,
     },
     messages,
