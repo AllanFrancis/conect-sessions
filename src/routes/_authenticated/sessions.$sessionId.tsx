@@ -94,8 +94,8 @@ function SessionPage() {
       <TermBox tone="accent" className="px-4 py-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="min-w-0 truncate text-primary">✻ {session?.title ?? "Sessão"}</p>
-          <Link to="/dashboard" className="shrink-0 text-xs text-muted-foreground hover:text-primary">
-            /sessions
+          <Link to="/dashboard" className={termLinkClass}>
+            ← Sessões
           </Link>
         </div>
         <p className="mt-1 flex items-center gap-2 truncate text-xs text-muted-foreground">
@@ -103,6 +103,7 @@ function SessionPage() {
           {session?.status ?? "…"} · {session?.source} · {session?.cwd ?? "—"}
         </p>
       </TermBox>
+
 
       <div className="flex-1 space-y-3 overflow-y-auto py-4">
         {(data?.messages ?? []).map((m) =>
