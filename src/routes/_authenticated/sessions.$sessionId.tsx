@@ -9,7 +9,6 @@ import {
   TermBox,
   TermButton,
   TermScreen,
-  termLinkClass,
 } from "@/components/terminal";
 import { projectName, sessionTitle } from "@/lib/session-display";
 import { toast } from "sonner";
@@ -100,8 +99,11 @@ function SessionPage() {
   return (
     <TermScreen className="flex min-h-screen flex-col">
       <TermBox tone="accent" className="px-4 py-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="flex min-w-0 items-center gap-2 truncate text-primary">
+        <div className="flex flex-wrap items-center gap-2">
+          <Link to="/dashboard">
+            <TermButton variant="ghost">← Voltar</TermButton>
+          </Link>
+          <p className="flex min-w-0 flex-1 items-center gap-2 truncate text-primary">
             <SourceIcon source={session?.source} />
             <span className="truncate">
               {sessionTitle(
@@ -111,9 +113,6 @@ function SessionPage() {
               )}
             </span>
           </p>
-          <Link to="/dashboard" className={termLinkClass}>
-            ← Sessões
-          </Link>
         </div>
         <p className="mt-1 flex items-center gap-2 truncate text-xs text-muted-foreground">
           <StatusDot status={session?.status ?? "idle"} />
