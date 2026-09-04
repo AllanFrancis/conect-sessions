@@ -129,14 +129,14 @@ node remote-agent.mjs`}
         </TermBox>
       )}
 
-      <div className="mt-4 space-y-1">
+      <div className="mt-4 space-y-2">
         {agents.length === 0 && (
           <p className="text-muted-foreground">Nenhuma máquina cadastrada ainda.</p>
         )}
         {agents.map((a) => (
           <div
             key={a.id}
-            className="group flex items-baseline gap-2 rounded px-2 py-1.5 hover:bg-accent/50"
+            className="flex items-center gap-3 rounded-md border border-border bg-card px-3 py-2.5"
           >
             <span className="select-none text-primary">⏺</span>
             <div className="min-w-0 flex-1">
@@ -148,17 +148,15 @@ node remote-agent.mjs`}
                   : "nunca conectou"}
               </p>
             </div>
-            <button
-              onClick={() => void remove(a.id)}
-              className="shrink-0 text-xs text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
-            >
-              remover
-            </button>
+            <TermButton variant="danger" onClick={() => void remove(a.id)}>
+              Remover
+            </TermButton>
           </div>
         ))}
       </div>
 
-      <TermHints items={["enter cria token", "token só aparece uma vez", "/sessions voltar"]} />
+      <TermHints items={["o token só aparece uma vez", "rode o agente na máquina do editor"]} />
+
     </TermScreen>
   );
 }
