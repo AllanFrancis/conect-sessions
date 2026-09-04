@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import type { ReactNode } from "react";
+import type { ButtonHTMLAttributes, ReactNode } from "react";
 
 /** Container central com o respiro típico de um terminal. */
 export function TermScreen({
