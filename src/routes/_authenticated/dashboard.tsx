@@ -1,9 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { StatusDot, TermBox, TermHints, TermScreen } from "@/components/terminal";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({
@@ -22,14 +20,6 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
   component: Dashboard,
 });
 
-const statusTone: Record<string, string> = {
-  running: "bg-primary text-primary-foreground",
-  waiting: "bg-destructive text-destructive-foreground",
-  idle: "bg-secondary text-secondary-foreground",
-  done: "bg-secondary text-secondary-foreground",
-  error: "bg-destructive text-destructive-foreground",
-};
-
 function Dashboard() {
   const navigate = useNavigate();
 
@@ -47,66 +37,68 @@ function Dashboard() {
   });
 
   return (
-    <main className="mx-auto max-w-5xl px-4 py-10">
-      <header className="mb-8 flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold">Sessões ao vivo</h1>
-          <p className="text-sm text-muted-foreground">
-            Atualiza automaticamente a cada 3 segundos.
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" asChild>
-            <Link to="/agents">Máquinas & tokens</Link>
-          </Button>
-          <Button
-            variant="ghost"
-            onClick={async () => {
-              await supabase.auth.signOut();
-              navigate({ to: "/auth" });
-            }}
-          >
-            Sair
-          </Button>
-        </div>
-      </header>
-
-      {isLoading ? (
-        <p className="text-sm text-muted-foreground">Carregando…</p>
-      ) : sessions.length === 0 ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>Nenhuma sessão ainda</CardTitle>
-            <CardDescription>
-              Crie um token em “Máquinas & tokens” e rode o agente local na máquina onde o Claude
-              Code ou o Kiro estão trabalhando.
-            </CardDescription>
-          </CardHeader>
-        </Card>
-      ) : (
-        <div className="grid gap-3">
-          {sessions.map((s) => (
-            <Link key={s.id} to="/sessions/$sessionId" params={{ sessionId: s.id }}>
-              <Card className="transition-colors hover:border-primary">
-                <CardContent className="flex flex-wrap items-center justify-between gap-3 py-4">
-                  <div className="min-w-0">
-                    <p className="truncate font-medium">{s.title}</p>
-                    <p className="truncate text-xs text-muted-foreground">
-                      {s.source} · {s.cwd ?? "—"}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-xs text-muted-foreground">
-                      {new Date(s.last_activity_at).toLocaleTimeString()}
-                    </span>
-                    <Badge className={statusTone[s.status] ?? ""}>{s.status}</Badge>
-                  </div>
-                </CardContent>
-              </Card>
+    <TermScreen>
+      <TermBox tone="accent" className="px-4 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-primary">✻ Sessões ao vivo</p>
+          <div className="flex items-center gap-3 text-xs">
+            <Link to="/agents" className="text-muted-foreground hover:text-primary">
+              /agents
             </Link>
-          ))}
+            <button
+              className="text-muted-foreground hover:text-primary"
+              onClick={async () => {
+                await supabase.auth.signOut();
+                navigate({ to: "/auth" });
+              }}
+            >
+              /exit
+            </button>
+          </div>
         </div>
-      )}
-    </main>
+        <p className="mt-1 text-xs text-muted-foreground">
+          poll 3s · {sessions.length} sessão(ões) conectada(s)
+        </p>
+      </TermBox>
+
+      <div className="mt-4 space-y-1">
+        {isLoading ? (
+          <p className="text-muted-foreground">✳ Carregando…</p>
+        ) : sessions.length === 0 ? (
+          <TermBox className="text-muted-foreground">
+            <p className="text-foreground">Nenhuma sessão ainda.</p>
+            <p className="mt-1">
+              Crie um token em{" "}
+              <Link to="/agents" className="text-primary hover:underline">
+                /agents
+              </Link>{" "}
+              e rode o agente local na máquina do editor.
+            </p>
+          </TermBox>
+        ) : (
+          sessions.map((s) => (
+            <Link
+              key={s.id}
+              to="/sessions/$sessionId"
+              params={{ sessionId: s.id }}
+              className="block rounded px-2 py-1.5 hover:bg-accent/50"
+            >
+              <div className="flex items-baseline gap-2">
+                <StatusDot status={s.status} />
+                <span className="min-w-0 flex-1 truncate text-foreground">{s.title}</span>
+                <span className="shrink-0 text-xs text-muted-foreground">
+                  {new Date(s.last_activity_at).toLocaleTimeString()}
+                </span>
+              </div>
+              <p className="truncate pl-6 text-xs text-muted-foreground">
+                {s.source} · {s.cwd ?? "—"} · {s.status}
+              </p>
+            </Link>
+          ))
+        )}
+      </div>
+
+      <TermHints items={["enter para abrir", "/agents tokens", "/exit sair"]} />
+    </TermScreen>
   );
 }
