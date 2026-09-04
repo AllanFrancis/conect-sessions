@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { TermBox, TermLine, TermScreen } from "@/components/terminal";
+import { TermBox, TermLine, TermScreen, termLinkClass } from "@/components/terminal";
 
 export const Route = createFileRoute("/")({
   head: () => ({

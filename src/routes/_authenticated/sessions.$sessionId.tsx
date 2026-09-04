@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import { supabase } from "@/integrations/supabase/client";
-import { StatusDot, TermBox, TermScreen } from "@/components/terminal";
+import { StatusDot, TermBox, TermButton, TermScreen, termLinkClass } from "@/components/terminal";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/sessions/$sessionId")({
