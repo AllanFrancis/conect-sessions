@@ -30,18 +30,39 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
 function Dashboard() {
   const navigate = useNavigate();
 
-  const { data: sessions = [], isLoading } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ["sessions"],
     refetchInterval: 3000,
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data: rows, error } = await supabase
         .from("sessions")
         .select("id, title, source, status, cwd, last_activity_at")
         .order("last_activity_at", { ascending: false });
       if (error) throw error;
-      return data ?? [];
+      const sessions = rows ?? [];
+      const firstMessages: Record<string, string> = {};
+      if (sessions.length) {
+        const { data: msgs } = await supabase
+          .from("messages")
+          .select("session_id, content, created_at")
+          .in(
+            "session_id",
+            sessions.map((s) => s.id),
+          )
+          .eq("role", "user")
+          .order("created_at", { ascending: true })
+          .limit(500);
+        for (const m of msgs ?? []) {
+          if (!firstMessages[m.session_id]) firstMessages[m.session_id] = m.content;
+        }
+      }
+      return { sessions, firstMessages };
     },
   });
+
+  const sessions = data?.sessions ?? [];
+  const firstMessages = data?.firstMessages ?? {};
+
 
   return (
     <TermScreen>
