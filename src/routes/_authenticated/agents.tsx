@@ -68,8 +68,8 @@ function AgentsPage() {
       <TermBox tone="accent" className="px-4 py-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-primary">✻ Máquinas & tokens</p>
-          <Link to="/dashboard" className="text-xs text-muted-foreground hover:text-primary">
-            /sessions
+          <Link to="/dashboard" className={termLinkClass}>
+            ← Sessões
           </Link>
         </div>
         <p className="mt-1 text-xs text-muted-foreground">
@@ -77,24 +77,24 @@ function AgentsPage() {
         </p>
       </TermBox>
 
-      <div className="mt-4 flex items-center gap-2 rounded-md border border-border px-3 py-2 focus-within:border-primary/70">
-        <span className="select-none text-primary">&gt;</span>
-        <input
-          value={name}
-          placeholder="nome da máquina, ex.: MacBook trabalho"
-          className="flex-1 bg-transparent text-foreground outline-none placeholder:text-muted-foreground"
-          onChange={(e) => setName(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") void add();
-          }}
-        />
-        <button
-          onClick={() => void add()}
-          className="shrink-0 text-xs text-muted-foreground hover:text-primary"
-        >
-          enter ⏎
-        </button>
+      <div className="mt-4 flex items-center gap-2">
+        <div className="flex flex-1 items-center gap-2 rounded-md border border-border bg-card px-3 py-2 focus-within:border-primary/70">
+          <span className="select-none text-primary">&gt;</span>
+          <input
+            value={name}
+            placeholder="nome da máquina, ex.: MacBook trabalho"
+            className="flex-1 bg-transparent text-foreground outline-none placeholder:text-muted-foreground"
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") void add();
+            }}
+          />
+        </div>
+        <TermButton variant="primary" disabled={!name.trim()} onClick={() => void add()}>
+          Criar token
+        </TermButton>
       </div>
+
 
       {newToken && (
         <TermBox tone="accent" className="mt-4 space-y-3 px-4 py-3">
