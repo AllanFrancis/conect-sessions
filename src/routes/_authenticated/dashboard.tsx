@@ -12,7 +12,6 @@ import {
 } from "@/components/terminal";
 import { projectName, sessionTitle } from "@/lib/session-display";
 
-
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({
     meta: [
@@ -39,7 +38,7 @@ function Dashboard() {
     queryFn: async () => {
       const { data: rows, error } = await supabase
         .from("sessions")
-        .select("id, title, source, status, cwd, last_activity_at")
+        .select("id, title, source, status, cwd, last_activity_at, ide, pid, detection_confidence")
         .order("last_activity_at", { ascending: false });
       if (error) throw error;
       const sessions = rows ?? [];
@@ -65,7 +64,6 @@ function Dashboard() {
 
   const sessions = data?.sessions ?? [];
   const firstMessages = data?.firstMessages ?? {};
-
 
   return (
     <TermScreen>
@@ -125,9 +123,14 @@ function Dashboard() {
                 </span>
               </div>
               <p className="mt-0.5 truncate pl-[3.25rem] text-xs text-muted-foreground">
-                {projectName(s.cwd, s.title)} · {s.status} · abrir conversa →
+                {projectName(s.cwd, s.title)} · {s.status}
+                {s.ide ? ` · ${s.ide}` : " · IDE desconhecida"}
+                {s.pid ? ` · pid ${s.pid}` : ""}
+                {s.detection_confidence && s.detection_confidence !== "confirmed"
+                  ? ` · ${s.detection_confidence}`
+                  : ""}{" "}
+                · abrir conversa →
               </p>
-
             </Link>
           ))
         )}
@@ -137,4 +140,3 @@ function Dashboard() {
     </TermScreen>
   );
 }
-

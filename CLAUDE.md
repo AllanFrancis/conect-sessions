@@ -49,7 +49,9 @@ Monitorar e responder sessões de IA (Claude Code, Kiro) rodando nas suas máqui
 
 **Stack:** TanStack Start 1.x + React 19 + TS + Vite 8 + Tailwind v4 + shadcn/ui (new-york) + Supabase + Nitro/Cloudflare · bun (`bun install`, `bun run dev|build|lint|format`, `bunx tsc --noEmit`). Sem test runner. `bunfig.toml` tem `minimumReleaseAge=86400` — excluir pacote exige confirmar com o usuário.
 
-**Três camadas:** agente local `public/agent/remote-agent.mjs` (Node puro, tail de logs de sessão, config só por env `LRC_*`) → API pública `src/routes/api/public/agent/sync.ts` (CORS `*`, autenticada pelo token do agente no body, devolve `replies` pendentes no mesmo round-trip — este round-trip É o protocolo; não há websocket) → dashboard `_authenticated/*` lendo Supabase no browser sob RLS, com polling react-query (3s/2s), **não** Realtime.
+**Três camadas:** agente local `public/agent/remote-agent.mjs` (Node puro, arquivo único servido por `?raw` — não dividir; tail de logs + session monitor, config só por env `LRC_*`) → API pública `src/routes/api/public/agent/sync.ts` (CORS `*`, autenticada pelo token do agente no body, devolve `replies` pendentes no mesmo round-trip — este round-trip É o protocolo; não há websocket) → dashboard `_authenticated/*` lendo Supabase no browser sob RLS, com polling react-query (3s/2s), **não** Realtime.
+
+**Session monitoring:** vida de sessão se PROVA (PID + start-time do processo, handle do log do Kiro), nunca por existência de arquivo — registro órfão de kill abrupto é real. Status `active|idle|finished|unknown`; o que não for provável fica `unknown` até o banco e a UI. Confira com `node remote-agent.mjs --probe`. Detalhe e evidências: `docs/session-monitoring.md`.
 
 **Regras duras do projeto:**
 - `vite.config.ts` fica mínimo — `@lovable.dev/vite-tanstack-config` já traz tanstackStart/react/tailwind/tsConfigPaths/nitro/devtools/alias.

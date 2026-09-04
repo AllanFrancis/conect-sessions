@@ -128,6 +128,12 @@ export type Database = {
           agent_id: string
           created_at: string
           cwd: string | null
+          detection_confidence: string | null
+          detection_source: string | null
+          ended_at: string | null
+          ide: string | null
+          pid: number | null
+          started_at: string | null
           external_id: string
           id: string
           last_activity_at: string
@@ -140,6 +146,12 @@ export type Database = {
           agent_id: string
           created_at?: string
           cwd?: string | null
+          detection_confidence?: string | null
+          detection_source?: string | null
+          ended_at?: string | null
+          ide?: string | null
+          pid?: number | null
+          started_at?: string | null
           external_id: string
           id?: string
           last_activity_at?: string
@@ -152,6 +164,12 @@ export type Database = {
           agent_id?: string
           created_at?: string
           cwd?: string | null
+          detection_confidence?: string | null
+          detection_source?: string | null
+          ended_at?: string | null
+          ide?: string | null
+          pid?: number | null
+          started_at?: string | null
           external_id?: string
           id?: string
           last_activity_at?: string

@@ -2,13 +2,7 @@ import { cn } from "@/lib/utils";
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 
 /** Container central com o respiro típico de um terminal. */
-export function TermScreen({
-  children,
-  className,
-}: {
-  children: ReactNode;
-  className?: string;
-}) {
+export function TermScreen({ children, className }: { children: ReactNode; className?: string }) {
   return (
     <main className={cn("mx-auto w-full max-w-4xl px-4 py-6 text-sm", className)}>{children}</main>
   );
@@ -66,17 +60,35 @@ export function TermLine({
 }
 
 const statusColor: Record<string, string> = {
+  // vocabulário do session monitor
+  active: "text-primary",
+  idle: "text-muted-foreground",
+  finished: "text-muted-foreground",
+  unknown: "text-muted-foreground",
+  // valores legados de agentes ainda não atualizados
   running: "text-primary",
   waiting: "text-destructive",
   error: "text-destructive",
-  idle: "text-muted-foreground",
   done: "text-muted-foreground",
+};
+
+// "?" deixa explícito o que o monitor não conseguiu provar, em vez de fingir
+// um estado. Ver docs/session-monitoring.md.
+const statusMarker: Record<string, string> = {
+  active: "✳",
+  running: "✳",
+  unknown: "?",
+  finished: "○",
+  done: "○",
 };
 
 export function StatusDot({ status }: { status: string }) {
   return (
-    <span className={cn("select-none", statusColor[status] ?? "text-muted-foreground")}>
-      {status === "running" ? "✳" : "⏺"}
+    <span
+      className={cn("select-none", statusColor[status] ?? "text-muted-foreground")}
+      title={status}
+    >
+      {statusMarker[status] ?? "⏺"}
     </span>
   );
 }
@@ -125,7 +137,6 @@ export function TermHints({ items }: { items: string[] }) {
   );
 }
 
-
 /** Marca visual de cada origem (no lugar do nome "kiro"/"claude-code"). */
 export function SourceIcon({
   source,
@@ -135,7 +146,8 @@ export function SourceIcon({
   className?: string | undefined;
 }) {
   const key = (source ?? "").toLowerCase();
-  const label = key === "claude-code" ? "Claude Code" : key === "kiro" ? "Kiro" : source || "agente";
+  const label =
+    key === "claude-code" ? "Claude Code" : key === "kiro" ? "Kiro" : source || "agente";
   return (
     <span
       title={label}
@@ -153,11 +165,7 @@ export function SourceIcon({
         </svg>
       ) : key === "kiro" ? (
         <svg viewBox="0 0 24 24" className="size-3.5 text-foreground" aria-hidden="true">
-          <path
-            d="M6 20V9a6 6 0 1 1 12 0v11l-3-2-3 2-3-2-3 2Z"
-            fill="currentColor"
-            opacity="0.9"
-          />
+          <path d="M6 20V9a6 6 0 1 1 12 0v11l-3-2-3 2-3-2-3 2Z" fill="currentColor" opacity="0.9" />
           <circle cx="9.6" cy="10" r="1.15" className="fill-secondary" />
           <circle cx="14.4" cy="10" r="1.15" className="fill-secondary" />
         </svg>
