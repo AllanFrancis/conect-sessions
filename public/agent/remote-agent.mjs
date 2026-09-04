@@ -182,8 +182,12 @@ async function tick() {
       const { messages } = readNew(file);
       const idleMs = Date.now() - fs.statSync(file).mtimeMs;
       const status = idleMs < 15000 ? "running" : idleMs < 5 * 60000 ? "waiting" : "idle";
-      if (messages.length > 0 || idleMs < 5 * 60000) {
-        await sync(file, messages, status);
+      if (messages.length > 0) {
+        for (let i = 0; i < messages.length; i += 200) {
+          await sync(file, messages.slice(i, i + 200), status);
+        }
+      } else if (idleMs < 5 * 60000) {
+        await sync(file, [], status);
       }
     } catch (err) {
       console.error("erro em", file, err.message);
