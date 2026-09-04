@@ -9,7 +9,6 @@ import {
   TermBox,
   TermButton,
   TermScreen,
-  termLinkClass,
 } from "@/components/terminal";
 import { projectName, sessionTitle } from "@/lib/session-display";
 import { toast } from "sonner";
