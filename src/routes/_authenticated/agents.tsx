@@ -95,10 +95,17 @@ function AgentsPage() {
           </CardHeader>
           <CardContent className="space-y-3">
             <code className="block break-all rounded bg-muted p-3 text-xs">{newToken}</code>
-            <p className="text-sm text-muted-foreground">Na máquina onde o editor roda:</p>
+            <p className="text-sm text-muted-foreground">
+              Na máquina onde o editor roda (macOS / Linux):
+            </p>
             <pre className="overflow-x-auto rounded bg-muted p-3 text-xs">
-              {`curl -o remote-agent.mjs ${baseUrl}/agent/remote-agent.mjs
+              {`curl -o remote-agent.mjs ${baseUrl}/api/public/agent/remote-agent
 LRC_URL=${baseUrl} LRC_TOKEN=${newToken} node remote-agent.mjs`}
+            </pre>
+            <p className="text-sm text-muted-foreground">Windows (PowerShell):</p>
+            <pre className="overflow-x-auto rounded bg-muted p-3 text-xs">
+              {`curl.exe -o remote-agent.mjs ${baseUrl}/api/public/agent/remote-agent
+$env:LRC_URL="${baseUrl}"; $env:LRC_TOKEN="${newToken}"; node remote-agent.mjs`}
             </pre>
           </CardContent>
         </Card>
