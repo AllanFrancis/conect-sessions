@@ -22,7 +22,7 @@ const bodySchema = z.object({
         seq: z.number().int().nullish(),
       }),
     )
-    .max(200)
+    .max(500)
     .default([]),
 });
 
@@ -52,8 +52,12 @@ export const Route = createFileRoute("/api/public/agent/sync")({
         let parsed;
         try {
           parsed = bodySchema.parse(await request.json());
-        } catch {
-          return json({ error: "Payload inválido" }, 400);
+        } catch (err) {
+          const detail =
+            err instanceof z.ZodError
+              ? err.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")
+              : "corpo ilegível";
+          return json({ error: "Payload inválido", detail }, 400);
         }
 
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
