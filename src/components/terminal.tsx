@@ -127,7 +127,13 @@ export function TermHints({ items }: { items: string[] }) {
 
 
 /** Marca visual de cada origem (no lugar do nome "kiro"/"claude-code"). */
-export function SourceIcon({ source, className }: { source?: string | null; className?: string }) {
+export function SourceIcon({
+  source,
+  className,
+}: {
+  source?: string | null | undefined;
+  className?: string | undefined;
+}) {
   const key = (source ?? "").toLowerCase();
   const label = key === "claude-code" ? "Claude Code" : key === "kiro" ? "Kiro" : source || "agente";
   return (
