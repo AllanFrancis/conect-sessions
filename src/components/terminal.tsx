@@ -87,7 +87,7 @@ export function TermButton({
   className,
   variant = "ghost",
   ...props
-}: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "ghost" | "danger" }) {
+}: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "ghost" | "danger" }) {
   return (
     <button
       {...props}
