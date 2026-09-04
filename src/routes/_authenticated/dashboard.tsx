@@ -33,12 +33,13 @@ function Dashboard() {
   const navigate = useNavigate();
 
   const { data, isLoading } = useQuery({
-    queryKey: ["sessions"],
+    queryKey: ["sessions", "active"],
     refetchInterval: 3000,
     queryFn: async () => {
       const { data: rows, error } = await supabase
         .from("sessions")
         .select("id, title, source, status, cwd, last_activity_at, ide, pid, detection_confidence")
+        .eq("status", "active")
         .order("last_activity_at", { ascending: false });
       if (error) throw error;
       const sessions = rows ?? [];
@@ -86,7 +87,7 @@ function Dashboard() {
           </div>
         </div>
         <p className="mt-1 text-xs text-muted-foreground">
-          atualiza a cada 3s · {sessions.length} sessão(ões) conectada(s)
+          atualiza a cada 3s · {sessions.length} sessão(ões) ativa(s)
         </p>
       </TermBox>
 
@@ -95,9 +96,9 @@ function Dashboard() {
           <p className="text-muted-foreground">✳ Carregando…</p>
         ) : sessions.length === 0 ? (
           <TermBox className="text-muted-foreground">
-            <p className="text-foreground">Nenhuma sessão ainda.</p>
+            <p className="text-foreground">Nenhuma sessão ativa agora.</p>
             <p className="mt-1">
-              Crie um token em{" "}
+              O painel lista apenas sessões rodando neste momento. Crie um token em{" "}
               <Link to="/agents" className="text-primary hover:underline">
                 Máquinas & tokens
               </Link>{" "}
@@ -136,7 +137,13 @@ function Dashboard() {
         )}
       </div>
 
-      <TermHints items={["clique numa sessão para abrir", "projeto = pasta lida pelo agente"]} />
+      <TermHints
+        items={[
+          "somente sessões ativas",
+          "clique numa sessão para abrir",
+          "projeto = pasta lida pelo agente",
+        ]}
+      />
     </TermScreen>
   );
 }
