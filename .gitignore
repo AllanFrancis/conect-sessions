@@ -39,3 +39,9 @@ supabase/.branches/
 
 # Variaveis de ambiente: contem service-role key, nunca versionar
 .env
+
+# Instalados pelo `supabase link` — reinstalaveis, nao sao codigo do projeto
+.agents/
+skills-lock.json
+.claude/skills/supabase/
+.claude/skills/supabase-postgres-best-practices/
