@@ -59,7 +59,9 @@ function AgentsPage() {
     queryClient.invalidateQueries({ queryKey: ["agents"] });
   }
 
-  const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
+  // A URL de preview exige login no navegador (o curl recebe "Unauthorized").
+  // Use sempre a URL pública estável do projeto para o agente local.
+  const baseUrl = "https://project--6db84ef0-e8b7-4d09-8f52-05d7d24dd80a.lovable.app";
 
   return (
     <TermScreen>
@@ -102,14 +104,23 @@ function AgentsPage() {
           </pre>
           <p className="text-xs text-muted-foreground">macOS / Linux:</p>
           <pre className="overflow-x-auto rounded bg-card p-3 text-xs text-muted-foreground">
-            {`curl -o remote-agent.mjs ${baseUrl}/api/public/agent/remote-agent
+            {`cd ~
+curl -fL -o remote-agent.mjs ${baseUrl}/api/public/agent/remote-agent
 LRC_URL=${baseUrl} LRC_TOKEN=${newToken} node remote-agent.mjs`}
           </pre>
           <p className="text-xs text-muted-foreground">Windows (PowerShell):</p>
           <pre className="overflow-x-auto rounded bg-card p-3 text-xs text-muted-foreground">
-            {`curl.exe -o remote-agent.mjs ${baseUrl}/api/public/agent/remote-agent
-$env:LRC_URL="${baseUrl}"; $env:LRC_TOKEN="${newToken}"; node remote-agent.mjs`}
+            {`cd $HOME
+curl.exe -fL -o remote-agent.mjs ${baseUrl}/api/public/agent/remote-agent
+$env:LRC_URL="${baseUrl}"
+$env:LRC_TOKEN="${newToken}"
+node remote-agent.mjs`}
           </pre>
+          <p className="text-xs text-muted-foreground">
+            ⚠ Use exatamente essa URL. A URL de preview pede login no navegador e o download
+            retorna “Unauthorized” (arquivo de 12 bytes). Publique o projeto uma vez para essa URL
+            ficar ativa.
+          </p>
         </TermBox>
       )}
 
