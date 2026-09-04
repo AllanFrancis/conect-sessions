@@ -1,0 +1,14 @@
+# Repo normalizado em LF: o git guarda e faz checkout em LF em qualquer SO,
+# o que casa com o default do prettier (endOfLine: "lf") e evita que um clone
+# no Windows reintroduza CRLF e quebre `bun run lint`.
+* text=auto eol=lf
+
+# Binarios: nunca tocar nos bytes.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.woff binary
+*.woff2 binary
