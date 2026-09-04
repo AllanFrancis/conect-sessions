@@ -111,21 +111,20 @@ function Dashboard() {
               params={{ sessionId: s.id }}
               className="block rounded-md border border-border bg-card px-3 py-2.5 transition-colors hover:border-primary/70"
             >
-              <div className="flex items-baseline gap-2">
+              <div className="flex items-center gap-2">
                 <StatusDot status={s.status} />
+                <SourceIcon source={s.source} />
                 <span className="min-w-0 flex-1 truncate font-medium text-foreground">
-                  {s.title}
-                </span>
-                <span className="shrink-0 rounded border border-border px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
-                  {s.source}
+                  {sessionTitle(s.title, firstMessages[s.id], s.cwd)}
                 </span>
                 <span className="shrink-0 text-xs text-muted-foreground">
                   {new Date(s.last_activity_at).toLocaleTimeString()}
                 </span>
               </div>
-              <p className="mt-0.5 truncate pl-6 text-xs text-muted-foreground">
-                {s.cwd ?? "—"} · {s.status} · abrir conversa →
+              <p className="mt-0.5 truncate pl-[3.25rem] text-xs text-muted-foreground">
+                {projectName(s.cwd, s.title)} · {s.status} · abrir conversa →
               </p>
+
             </Link>
           ))
         )}
