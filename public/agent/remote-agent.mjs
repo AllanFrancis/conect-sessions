@@ -12,6 +12,7 @@
  * Variáveis opcionais:
  *   LRC_INTERVAL=2000                    intervalo de polling em ms
  *   LRC_WATCH=/caminho1,/caminho2        pastas extras com arquivos .jsonl/.json de sessão
+ *                                        (ficam no perfil do usuário, não no projeto)
  *   LRC_REPLY_CMD='echo "{{reply}}"'     comando executado para cada resposta recebida
  *                                        ({{reply}} = texto, {{session}} = id da sessão)
  *   LRC_REPLY_FILE=/caminho/inbox.txt    além disso, grava cada resposta neste arquivo
@@ -47,10 +48,14 @@ const EXTRA_DIRS = (process.env.LRC_WATCH || "")
 const DIRS = [...DEFAULT_DIRS, ...EXTRA_DIRS].filter((d) => fs.existsSync(d));
 
 if (DIRS.length === 0) {
-  console.error("Nenhuma pasta de sessão encontrada. Use LRC_WATCH=/caminho para indicar uma.");
+  console.error("Nenhuma pasta de sessão encontrada no perfil do usuário.");
+  console.error("Essas pastas não ficam dentro do seu projeto.");
+  console.error('Se o histórico estiver em outro local, defina: $env:LRC_WATCH="C:\\caminho\\das\\sessoes"');
   process.exit(1);
 }
 
+console.log(`Perfil do usuário: ${HOME}`);
+console.log("As pastas abaixo são do Claude/Kiro e não precisam existir dentro do projeto.");
 console.log("Monitorando:");
 DIRS.forEach((d) => console.log("  -", d));
 
