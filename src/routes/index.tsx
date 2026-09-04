@@ -68,7 +68,6 @@ function Index() {
       <p className="mt-3 text-xs text-muted-foreground">
         agente local em Node.js · sem instalar nada no editor
       </p>
-
     </TermScreen>
   );
 }

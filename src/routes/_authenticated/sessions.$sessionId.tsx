@@ -3,13 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import { supabase } from "@/integrations/supabase/client";
-import {
-  SourceIcon,
-  StatusDot,
-  TermBox,
-  TermButton,
-  TermScreen,
-} from "@/components/terminal";
+import { SourceIcon, StatusDot, TermBox, TermButton, TermScreen } from "@/components/terminal";
 import { projectName, sessionTitle } from "@/lib/session-display";
 import { toast } from "sonner";
 
@@ -120,7 +114,6 @@ function SessionPage() {
         </p>
       </TermBox>
 
-
       <div className="flex-1 space-y-3 overflow-y-auto py-4">
         {(data?.messages ?? []).map((m) =>
           m.role === "user" ? (
@@ -168,7 +161,11 @@ function SessionPage() {
               }
             }}
           />
-          <TermButton variant="primary" disabled={sending || !reply.trim()} onClick={() => void send()}>
+          <TermButton
+            variant="primary"
+            disabled={sending || !reply.trim()}
+            onClick={() => void send()}
+          >
             {sending ? "Enviando…" : "Enviar"}
           </TermButton>
         </div>
@@ -176,7 +173,6 @@ function SessionPage() {
           enter envia · shift+enter nova linha · atualiza a cada 2s
         </p>
       </div>
-
     </TermScreen>
   );
 }

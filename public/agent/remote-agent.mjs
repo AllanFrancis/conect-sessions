@@ -14,7 +14,7 @@
  *     envia as novas para o painel, recebendo de volta as respostas remotas.
  *
  * Uso:
- *   LRC_URL=https://seu-app.lovable.app LRC_TOKEN=lrc_xxx node remote-agent.mjs
+ *   LRC_URL=https://seu-painel.exemplo.com LRC_TOKEN=lrc_xxx node remote-agent.mjs
  *
  * Diagnóstico (não precisa de URL nem token) — imprime o que o monitor enxerga:
  *   node remote-agent.mjs --probe
