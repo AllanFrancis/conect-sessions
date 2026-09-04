@@ -15,6 +15,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedAgentsRouteImport } from './routes/_authenticated/agents'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedSessionsSessionIdRouteImport } from './routes/_authenticated/sessions.$sessionId'
+import { Route as ApiPublicAgentRemoteAgentRouteImport } from './routes/api/public/agent/remote-agent'
 import { Route as ApiPublicAgentSyncRouteImport } from './routes/api/public/agent/sync'
 
 const IndexRoute = IndexRouteImport.update({
@@ -47,6 +48,12 @@ const AuthenticatedSessionsSessionIdRoute =
     path: '/sessions/$sessionId',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const ApiPublicAgentRemoteAgentRoute =
+  ApiPublicAgentRemoteAgentRouteImport.update({
+    id: '/api/public/agent/remote-agent',
+    path: '/api/public/agent/remote-agent',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicAgentSyncRoute = ApiPublicAgentSyncRouteImport.update({
   id: '/api/public/agent/sync',
   path: '/api/public/agent/sync',
@@ -59,6 +66,7 @@ export interface FileRoutesByFullPath {
   '/agents': typeof AuthenticatedAgentsRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/sessions/$sessionId': typeof AuthenticatedSessionsSessionIdRoute
+  '/api/public/agent/remote-agent': typeof ApiPublicAgentRemoteAgentRoute
   '/api/public/agent/sync': typeof ApiPublicAgentSyncRoute
 }
 export interface FileRoutesByTo {
@@ -67,6 +75,7 @@ export interface FileRoutesByTo {
   '/agents': typeof AuthenticatedAgentsRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/sessions/$sessionId': typeof AuthenticatedSessionsSessionIdRoute
+  '/api/public/agent/remote-agent': typeof ApiPublicAgentRemoteAgentRoute
   '/api/public/agent/sync': typeof ApiPublicAgentSyncRoute
 }
 export interface FileRoutesById {
@@ -77,6 +86,7 @@ export interface FileRoutesById {
   '/_authenticated/agents': typeof AuthenticatedAgentsRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/sessions/$sessionId': typeof AuthenticatedSessionsSessionIdRoute
+  '/api/public/agent/remote-agent': typeof ApiPublicAgentRemoteAgentRoute
   '/api/public/agent/sync': typeof ApiPublicAgentSyncRoute
 }
 export interface FileRouteTypes {
@@ -87,6 +97,7 @@ export interface FileRouteTypes {
     | '/agents'
     | '/dashboard'
     | '/sessions/$sessionId'
+    | '/api/public/agent/remote-agent'
     | '/api/public/agent/sync'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -95,6 +106,7 @@ export interface FileRouteTypes {
     | '/agents'
     | '/dashboard'
     | '/sessions/$sessionId'
+    | '/api/public/agent/remote-agent'
     | '/api/public/agent/sync'
   id:
     | '__root__'
@@ -104,6 +116,7 @@ export interface FileRouteTypes {
     | '/_authenticated/agents'
     | '/_authenticated/dashboard'
     | '/_authenticated/sessions/$sessionId'
+    | '/api/public/agent/remote-agent'
     | '/api/public/agent/sync'
   fileRoutesById: FileRoutesById
 }
@@ -111,6 +124,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
+  ApiPublicAgentRemoteAgentRoute: typeof ApiPublicAgentRemoteAgentRoute
   ApiPublicAgentSyncRoute: typeof ApiPublicAgentSyncRoute
 }
 
@@ -158,6 +172,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSessionsSessionIdRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/api/public/agent/remote-agent': {
+      id: '/api/public/agent/remote-agent'
+      path: '/api/public/agent/remote-agent'
+      fullPath: '/api/public/agent/remote-agent'
+      preLoaderRoute: typeof ApiPublicAgentRemoteAgentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/agent/sync': {
       id: '/api/public/agent/sync'
       path: '/api/public/agent/sync'
@@ -187,6 +208,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
+  ApiPublicAgentRemoteAgentRoute: ApiPublicAgentRemoteAgentRoute,
   ApiPublicAgentSyncRoute: ApiPublicAgentSyncRoute,
 }
 export const routeTree = rootRouteImport
