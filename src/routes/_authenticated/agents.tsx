@@ -4,7 +4,13 @@ import { useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { createAgent } from "@/lib/agents.functions";
-import { TermBox, TermHints, TermScreen } from "@/components/terminal";
+import {
+  TermBox,
+  TermButton,
+  TermHints,
+  TermScreen,
+  termLinkClass,
+} from "@/components/terminal";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/agents")({
