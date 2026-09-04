@@ -11,8 +11,10 @@ export default tseslint.config(
       "dist",
       ".output",
       ".vinxi",
-      // Tooling do sistema SPEC, nao e codigo da app.
+      // Tooling e artefatos do sistema SPEC, nao sao codigo da app —
+      // `docs/**/tmp/` guarda harness descartavel de verificacao.
       "scripts",
+      "docs",
       // Gerados: TanStack Router e `supabase gen types`.
       "src/routeTree.gen.ts",
       "src/integrations/supabase/types.ts",

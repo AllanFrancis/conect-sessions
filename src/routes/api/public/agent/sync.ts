@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
+import type { Json } from "@/integrations/supabase/types";
 
 const bodySchema = z.object({
   token: z.string().min(10).max(200),
@@ -37,6 +38,9 @@ const bodySchema = z.object({
           .nullish()
           .transform((v) => v ?? ""),
         seq: z.number().int().nullish(),
+        // Estrutura que nao cabe em `content` (pergunta de escolha e a prova
+        // de qual opcao foi escolhida). Opcional: agente antigo nao manda.
+        meta: z.record(z.unknown()).nullish(),
       }),
     )
     .max(500)
@@ -130,8 +134,22 @@ export const Route = createFileRoute("/api/public/agent/sync")({
             role: m.role,
             content: m.content,
             seq: m.seq ?? i,
+            // O zod valida "é um objeto" e para por aí, de propósito: `meta` é
+            // aditivo e o agente pode ganhar chaves sem a API mudar. Isso deixa
+            // o tipo em `Record<string, unknown>`, que o TS não reconhece como
+            // `Json`. O valor veio de `request.json()`, então é JSON por
+            // construção — a asserção afirma o que o parser já garantiu.
+            meta: (m.meta ?? null) as Json,
           }));
-          const withId = rows.filter((r) => r.external_id !== null);
+          // O Kiro reescreve a MESMA linha (mesmo `id`, payload idêntico) a cada
+          // mudança de estado da interação — visto até 6x no mesmo arquivo. Entre
+          // lotes o ON CONFLICT DO NOTHING resolve; dentro do lote a repetição
+          // chegaria como duas linhas no mesmo INSERT, então some aqui.
+          const withId = [
+            ...new Map(
+              rows.filter((r) => r.external_id !== null).map((r) => [r.external_id, r]),
+            ).values(),
+          ];
           const withoutId = rows.filter((r) => r.external_id === null);
           if (withId.length) {
             await supabaseAdmin

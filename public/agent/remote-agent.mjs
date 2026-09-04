@@ -769,22 +769,320 @@ function projectOf(file) {
   return { name: folder, cwd: dir };
 }
 
-function normalize(obj) {
+/**
+ * Prefixos com que o Claude Code devolve a escolha do AskUserQuestion.
+ *
+ * SAO DOIS, nao um. Contados nas transcricoes reais desta maquina:
+ *   474x  "Your questions have been answered:"
+ *    20x  "The user answered:"
+ * Reconhecer so o primeiro tem custo duplo, e os dois apareceram no painel: a
+ * frase em ingles vaza como fala do usuario, E a pergunta continua parecendo
+ * sem resposta, convidando a responder de novo algo ja respondido no terminal.
+ * Achado no passe de browser, nao no harness — a fixture so tinha o primeiro.
+ */
+const ANSWER_PREFIXES = ["Your questions have been answered:", "The user answered:"];
+
+/** Se este texto de tool_result e o marcador de resposta do AskUserQuestion. */
+function isAnswerText(text) {
+  return ANSWER_PREFIXES.some((prefix) => text.startsWith(prefix));
+}
+
+/**
+ * Pares `"pergunta"="resposta"` de dentro do tool_result do AskUserQuestion.
+ * Em multiSelect a resposta ja vem com as opcoes separadas por virgula.
+ *
+ * ATENCAO: e o ultimo recurso. A frase do CLI NAO escapa aspas dentro do texto
+ * da pergunta, entao um enunciado como
+ *   "E o vazamento (416 msgs "queue-operation")?"="Corrigir junto"
+ * e ambiguo por construcao e faz o regex escorregar, produzindo chave lixo.
+ * Visto em transcricao real desta maquina. Prefira sempre `toolUseResult`.
+ */
+function parseAnswers(text) {
+  const answers = {};
+  for (const m of text.matchAll(/"((?:[^"\\]|\\.)*)"="((?:[^"\\]|\\.)*)"/g)) {
+    answers[m[1]] = m[2];
+  }
+  return Object.keys(answers).length ? answers : null;
+}
+
+/**
+ * As respostas do AskUserQuestion, preferindo a fonte estruturada.
+ *
+ * O Claude Code grava `toolUseResult.answers` como objeto JSON de verdade, na
+ * mesma linha do tool_result — exato, sem ambiguidade de aspas. O regex sobre a
+ * frase em ingles fica so para transcricao que nao traga esse campo.
+ */
+function answersOf(obj, text) {
+  const structured = obj?.toolUseResult?.answers;
+  if (structured && typeof structured === "object" && !Array.isArray(structured)) {
+    return Object.keys(structured).length ? structured : null;
+  }
+  return parseAnswers(text);
+}
+
+// ---------------------------------------------------------------------------
+// adaptador de transcricao: KIRO
+// ---------------------------------------------------------------------------
+
+/**
+ * Rotulo, descricao e id de uma opcao do Kiro.
+ *
+ * Duas formas convivem no mesmo arquivo: a aprovacao de ferramenta grava
+ * `{optionId, name, kind}` e a pergunta ao usuario grava
+ * `{title, description, recommended}`. O `optionId` viaja junto porque e ele —
+ * e nao o rotulo — que o `interaction_resolved` devolve na aprovacao.
+ */
+function kiroOption(opt) {
+  if (!opt || typeof opt !== "object") return null;
+  const label =
+    typeof opt.name === "string" ? opt.name : typeof opt.title === "string" ? opt.title : null;
+  if (!label) return null;
+  return {
+    label,
+    ...(typeof opt.description === "string" && opt.description
+      ? { description: opt.description }
+      : {}),
+    ...(typeof opt.optionId === "string" ? { id: opt.optionId } : {}),
+  };
+}
+
+/**
+ * Quantos caracteres de saída de ferramenta atravessam para o painel.
+ *
+ * A mediana real é 339 e o p90 é 5746, mas um `read_file` de arquivo grande
+ * chega a 78 mil — e a transcrição inteira é repolida a cada 2s no celular.
+ * O corte é declarado na UI ("saída (truncada)"), nunca silencioso.
+ */
+const KIRO_RESULT_MAX = 4000;
+
+/** Chaves de `args` que identificam a chamada, da mais específica à mais geral. */
+const KIRO_ARG_KEYS = [
+  "path",
+  "targetFile",
+  "command",
+  "query",
+  "url",
+  "requirementsFilePath",
+  "files",
+  "name",
+  "action",
+  "title",
+];
+
+/**
+ * O QUE a ferramenta operou, em uma linha: o caminho do read_file, o comando do
+ * execute_pwsh, a query do grep_search. Despejar `args` inteiro seria o ruido
+ * bruto que nao queremos; sem nada, "Read File" repetido 145x nao diz nada.
+ */
+function kiroTarget(args) {
+  if (!args || typeof args !== "object") return null;
+  for (const key of KIRO_ARG_KEYS) {
+    const value = args[key];
+    if (typeof value === "string" && value.trim()) return value.slice(0, 300);
+    if (Array.isArray(value) && value.every((v) => typeof v === "string") && value.length)
+      return value.join(", ").slice(0, 300);
+  }
+  return null;
+}
+
+/**
+ * Indice `toolCallId -> payload do tool_call` do arquivo INTEIRO.
+ *
+ * O `tool_result` do Kiro NAO carrega o nome da ferramenta — so `toolCallId`,
+ * `content` e `success`. Quem sabe o que foi chamado e o `tool_call`, que veio
+ * antes. Indexar o arquivo todo (e nao so as linhas novas do tick) e o que
+ * garante a associacao mesmo quando a chamada foi lida num tick anterior: sem
+ * isso o resultado chegaria orfao, sem dizer de que interacao ele e.
+ */
+function kiroToolCalls(lines) {
+  const index = new Map();
+  for (const line of lines) {
+    // Filtro barato antes do JSON.parse: o arquivo inteiro passa aqui a cada tick.
+    if (!line.includes('"tool_call"')) continue;
+    let obj;
+    try {
+      obj = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    const payload = obj?.payload;
+    if (payload?.type === "tool_call" && typeof payload.toolCallId === "string") {
+      index.set(payload.toolCallId, payload);
+    }
+  }
+  return index;
+}
+
+/** Rotulo do tipo de interacao, para a UI dizer o que esta sendo perguntado. */
+// Este texto vai para a TELA, entao leva acento — ao contrario dos comentarios
+// deste arquivo, que sao ASCII por convencao dele.
+const KIRO_ASK_HEADER = { tool_approval: "aprovar ação", user_input: "pergunta" };
+
+/**
+ * Traduz uma linha do `messages.jsonl` do Kiro.
+ *
+ * O Kiro NAO usa o envelope do Claude Code: cada linha e
+ * `{id, timestamp, payload:{type, ...}}` e o texto mora em `payload.content`.
+ * Sem este adaptador o `normalize()` procurava `obj.role`/`obj.content`, achava
+ * `undefined` nos dois e descartava a linha — as 2761 linhas de transcricao do
+ * Kiro desta maquina viravam ZERO mensagem, e o painel mostrava a sessao vazia.
+ *
+ * Vira mensagem o que e conversa mais o RESULTADO de ferramenta, dobrado com a
+ * chamada que o originou. `turn_start/end`, `session_metadata`,
+ * `usage_summary`, `sub_agent_*`, `steering_inclusion` e `session_start` sao
+ * infraestrutura da IDE e seguem invisiveis; o `tool_call` sozinho tambem, por
+ * viver dentro do `tool_result` que ele produziu.
+ */
+function normalizeKiro(obj, payload, ctx) {
+  const externalId = typeof obj.id === "string" ? obj.id : null;
+  const build = (role, text, meta) => {
+    const content = typeof text === "string" ? text : "";
+    if (!content.trim() && !meta) return null;
+    return {
+      role,
+      content: content.slice(0, 100000),
+      external_id: externalId,
+      ...(meta ? { meta } : {}),
+    };
+  };
+
+  if (payload.type === "user") return build("user", payload.content, null);
+
+  if (payload.type === "assistant") {
+    // `Say` e a fala e `Reasoning` e o pensamento. Os dois entram: no Kiro o
+    // Say costuma ser so emenda ("Agora o servidor:") e a narrativa inteira
+    // mora no Reasoning — 306 de 413 blocos nesta maquina. Vai marcado, para a
+    // UI desenhar pensamento diferente de resposta em vez de misturar os dois.
+    const meta = payload.operationType === "Reasoning" ? { kind: "reasoning" } : null;
+    return build("assistant", payload.content, meta);
+  }
+
+  if (payload.type === "pending_interaction") {
+    if (typeof payload.question !== "string" || !payload.question.trim()) return null;
+    const options = (Array.isArray(payload.options) ? payload.options : [])
+      .map(kiroOption)
+      .filter(Boolean);
+    if (!options.length) return null;
+    // Reusa o mesmo `meta.ask` do AskUserQuestion: a UI ja sabe desenhar isto.
+    // O Kiro nao tem multiSelect nesta estrutura — uma escolha por interacao.
+    return build("assistant", "", {
+      ask: [
+        {
+          question: payload.question,
+          header: KIRO_ASK_HEADER[payload.interactionType] ?? payload.interactionType ?? null,
+          multiSelect: false,
+          options,
+        },
+      ],
+      tool_use_id: typeof payload.toolCallId === "string" ? payload.toolCallId : null,
+    });
+  }
+
+  if (payload.type === "interaction_resolved") {
+    if (typeof payload.toolCallId !== "string") return null;
+    // O Kiro nao repete o enunciado aqui, entao nao da para montar o mapa
+    // `{pergunta: resposta}` do Claude Code. O que ele da e a escolha crua: o
+    // rotulo na pergunta ao usuario, o `optionId` na aprovacao de ferramenta.
+    // A UI casa por rotulo OU por id; `cancelled` vem sem escolha nenhuma e
+    // tranca a pergunta sem marcar opcao, que e a verdade do que aconteceu.
+    return build("user", "", {
+      answers_tool_use_id: payload.toolCallId,
+      answer: typeof payload.selectedOption === "string" ? payload.selectedOption : null,
+      outcome: typeof payload.outcome === "string" ? payload.outcome : null,
+    });
+  }
+
+  if (payload.type === "tool_result") {
+    if (typeof payload.toolCallId !== "string") return null;
+    // Chamada e resultado viram UMA mensagem, na posicao do resultado. O
+    // `tool_call` sozinho nao vira nada: ele so anuncia "vou fazer", e a linha
+    // seguinte ja diz o que aconteceu. Dobrar os dois preserva a ordem da sessao
+    // e prende o resultado na interacao a que ele pertence — o `call_id` e o
+    // MESMO id da aprovacao, quando a chamada precisou de uma.
+    const call = ctx?.toolCalls?.get(payload.toolCallId);
+    const raw = typeof payload.content === "string" ? payload.content : "";
+    // `{}` e como o Kiro grava "sem saida"; nao e saida com chaves dentro.
+    const text = raw.trim() === "{}" ? "" : raw;
+    return build("assistant", text.slice(0, KIRO_RESULT_MAX), {
+      tool: {
+        call_id: payload.toolCallId,
+        name: typeof call?.toolName === "string" ? call.toolName : null,
+        title: typeof call?.title === "string" ? call.title : null,
+        kind: typeof call?.kind === "string" ? call.kind : null,
+        target: kiroTarget(call?.args),
+        ok: payload.success !== false,
+        truncated: text.length > KIRO_RESULT_MAX,
+      },
+    });
+  }
+
+  return null;
+}
+
+/**
+ * Varre o array de content em vez de achata-lo.
+ *
+ * O achatamento antigo (`p.text ?? p.content`) jogava fora todo bloco
+ * `tool_use`: uma pergunta de escolha nao tem `text`, entao a mensagem inteira
+ * virava null e sumia do painel. Aqui o texto continua sendo concatenado como
+ * antes, e o que e estrutura (a pergunta, e a prova de qual opcao foi
+ * escolhida) sai em `meta`, para a UI desenhar botoes de verdade.
+ */
+function normalize(obj, ctx) {
   if (!obj || typeof obj !== "object") return null;
+  // O Kiro tem envelope proprio; o resto desta funcao e o do Claude Code.
+  if (obj.payload && typeof obj.payload === "object" && typeof obj.payload.type === "string") {
+    return normalizeKiro(obj, obj.payload, ctx);
+  }
   const node = obj.message && typeof obj.message === "object" ? obj.message : obj;
   const role = node.role || obj.type || obj.sender || "assistant";
   let content = node.content ?? node.text ?? obj.text ?? obj.content;
+  let meta = null;
+
   if (Array.isArray(content)) {
-    content = content
-      .map((p) => (typeof p === "string" ? p : (p?.text ?? p?.content ?? "")))
-      .filter(Boolean)
-      .join("\n");
+    const texts = [];
+    for (const part of content) {
+      if (typeof part === "string") {
+        texts.push(part);
+        continue;
+      }
+      if (!part || typeof part !== "object") continue;
+
+      if (part.type === "tool_use" && part.name === "AskUserQuestion") {
+        const questions = part.input?.questions;
+        if (Array.isArray(questions) && questions.length) {
+          meta = { ...(meta ?? {}), ask: questions, tool_use_id: part.id ?? null };
+        }
+        continue;
+      }
+
+      const inner = part.text ?? part.content ?? "";
+      // A resposta de uma pergunta de escolha chega como tool_result cujo texto
+      // e uma frase em ingles do proprio CLI. Ela nao e fala do usuario: vira
+      // marcador estruturado, e o texto some da transcricao.
+      if (part.type === "tool_result" && typeof inner === "string" && isAnswerText(inner)) {
+        meta = {
+          ...(meta ?? {}),
+          answers_tool_use_id: part.tool_use_id ?? null,
+          answers: answersOf(obj, inner),
+        };
+        continue;
+      }
+      if (typeof inner === "string" && inner) texts.push(inner);
+    }
+    content = texts.join("\n");
   }
-  if (typeof content !== "string" || !content.trim()) return null;
+
+  if (typeof content !== "string") content = "";
+  // So descarta quando nao sobrou NADA. Antes, mensagem sem texto era
+  // descartada mesmo carregando a pergunta.
+  if (!content.trim() && !meta) return null;
+
   return {
     role: role === "human" ? "user" : role,
     content: content.slice(0, 100000),
     external_id: obj.uuid || obj.id || null,
+    ...(meta ? { meta } : {}),
   };
 }
 
@@ -820,6 +1118,9 @@ function readNew(file) {
   const lines = raw.split("\n").filter((l) => l.trim());
   const start = sent.get(file) ?? 0;
   const fresh = lines.slice(start);
+  // O indice cobre o arquivo INTEIRO, nao so as linhas novas: a chamada pode ter
+  // sido lida num tick anterior e o resultado chegar so agora.
+  const ctx = sourceOf(file) === "kiro" ? { toolCalls: kiroToolCalls(lines) } : undefined;
   sent.set(file, lines.length);
   const messages = [];
   fresh.forEach((line, i) => {
@@ -827,7 +1128,7 @@ function readNew(file) {
       const parsed = JSON.parse(line);
       const items = Array.isArray(parsed) ? parsed : [parsed];
       for (const item of items) {
-        const m = normalize(item);
+        const m = normalize(item, ctx);
         if (m) messages.push({ ...m, seq: start + i });
       }
     } catch {

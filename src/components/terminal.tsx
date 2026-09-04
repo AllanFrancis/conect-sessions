@@ -1,5 +1,7 @@
 import { cn } from "@/lib/utils";
+import { useState } from "react";
 import type { ButtonHTMLAttributes, ReactNode } from "react";
+import { toast } from "sonner";
 
 /** Container central com o respiro típico de um terminal. */
 export function TermScreen({ children, className }: { children: ReactNode; className?: string }) {
@@ -28,6 +30,20 @@ export function TermBox({
     >
       {children}
     </div>
+  );
+}
+
+/** Etiqueta curta que rotula um bloco (cabeçalho de pergunta, raciocínio). */
+export function TermTag({ children, className }: { children: ReactNode; className?: string }) {
+  return (
+    <span
+      className={cn(
+        "inline-block rounded-[4px] border border-border px-1.5 py-0.5 text-xs text-muted-foreground",
+        className,
+      )}
+    >
+      {children}
+    </span>
   );
 }
 
@@ -173,5 +189,46 @@ export function SourceIcon({
         <span className="text-[10px] text-muted-foreground">◆</span>
       )}
     </span>
+  );
+}
+
+/**
+ * Bloco de código como card: rótulo da linguagem, copiar e rolagem própria.
+ *
+ * O `overflow-x-auto` fica AQUI, não no pai: linha longa de código é o único
+ * conteúdo largo da transcrição, e sem esse contêiner ela empurraria o body
+ * inteiro de lado — que no celular é a diferença entre ler e não ler.
+ */
+export function TermCode({ language, code }: { language?: string; code: string }) {
+  const [copied, setCopied] = useState(false);
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // Sem permissão de clipboard (http, iOS antigo): o texto segue
+      // selecionável na mão, então não vale interromper com erro.
+      toast.error("Não foi possível copiar");
+    }
+  }
+
+  return (
+    <div className="my-2 overflow-hidden rounded-md border border-border bg-card">
+      <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-1.5">
+        <span className="truncate text-xs text-muted-foreground">{language || "código"}</span>
+        <button
+          type="button"
+          onClick={() => void copy()}
+          className="shrink-0 text-xs text-muted-foreground transition-colors hover:text-primary"
+        >
+          {copied ? "copiado ✓" : "copiar"}
+        </button>
+      </div>
+      <pre className="overflow-x-auto px-3 py-2 text-xs leading-relaxed text-foreground">
+        <code>{code}</code>
+      </pre>
+    </div>
   );
 }

@@ -53,14 +53,11 @@ Monitorar e responder sessões de IA (Claude Code, Kiro) rodando nas suas máqui
 
 **Session monitoring:** vida de sessão se PROVA (PID + start-time do processo, handle do log do Kiro), nunca por existência de arquivo — registro órfão de kill abrupto é real. Status `active|idle|finished|unknown`; o que não for provável fica `unknown` até o banco e a UI. Confira com `node remote-agent.mjs --probe`. Detalhe e evidências: `docs/session-monitoring.md`.
 
-**Regras duras do projeto:**
-- `vite.config.ts` monta a lista de plugins explicitamente, nesta ordem: devtools (só `mode=development`) → tailwind → tsConfigPaths → tanstackStart → nitro (só `command=build`) → viteReact. Ordem e unicidade importam: plugin duplicado ou fora de ordem quebra o app.
-- `supabaseAdmin` (service role) só por `await import(...)` DENTRO do handler; top-level apenas em outros `*.server.ts`.
-- Todo `createServerFn` novo: `.middleware([requireSupabaseAuth])`, escrevendo por `context.supabase`/`context.userId`.
+**Regras duras — sempre:**
 - tsconfig estrito: env por bracket notation (`process.env['X']`). Nunca importar `server-only` — use `*.server.ts`.
-- `src/routeTree.gen.ts` (TanStack Router) e `src/integrations/supabase/types.ts` (`supabase gen types`) são gerados — não editar à mão; o resto de `src/integrations/` é código do projeto.
-- Tabela nova: RLS `auth.uid() = user_id` + `user_id` denormalizado; migrations em `supabase/migrations/`.
-- UI: compor as primitivas de `src/components/terminal.tsx`; cores só oklch em `src/styles.css` (`:root` + `.dark` + `@theme inline`); títulos por `sessionTitle()`/`projectName()`.
+- `src/routeTree.gen.ts` e `src/integrations/supabase/types.ts` são GERADOS — não editar à mão; o resto de `src/integrations/` é código do projeto.
+
+**Regras duras POR REGIÃO** (ordem de plugins do `vite.config.ts`, `supabaseAdmin` só dentro do handler, `createServerFn` com `requireSupabaseAuth`, RLS de tabela nova, UI pelas primitivas do terminal, adaptador de transcrição por IDE): `docs/ARCHITECTURE.md` — ler ao tocar a região.
 
 Notas longas preservadas em `CLAUDE.md.pre-spec.bak` (destino: `docs/features/*` no bootstrap brownfield).
 <!-- projeto:fim -->

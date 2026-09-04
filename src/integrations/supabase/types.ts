@@ -50,6 +50,7 @@ export type Database = {
           created_at: string
           external_id: string | null
           id: string
+          meta: Json | null
           role: string
           seq: number | null
           session_id: string
@@ -60,6 +61,7 @@ export type Database = {
           created_at?: string
           external_id?: string | null
           id?: string
+          meta?: Json | null
           role?: string
           seq?: number | null
           session_id: string
@@ -70,6 +72,7 @@ export type Database = {
           created_at?: string
           external_id?: string | null
           id?: string
+          meta?: Json | null
           role?: string
           seq?: number | null
           session_id?: string
@@ -131,13 +134,13 @@ export type Database = {
           detection_confidence: string | null
           detection_source: string | null
           ended_at: string | null
-          ide: string | null
-          pid: number | null
-          started_at: string | null
           external_id: string
           id: string
+          ide: string | null
           last_activity_at: string
+          pid: number | null
           source: string
+          started_at: string | null
           status: string
           title: string
           user_id: string
@@ -149,13 +152,13 @@ export type Database = {
           detection_confidence?: string | null
           detection_source?: string | null
           ended_at?: string | null
-          ide?: string | null
-          pid?: number | null
-          started_at?: string | null
           external_id: string
           id?: string
+          ide?: string | null
           last_activity_at?: string
+          pid?: number | null
           source?: string
+          started_at?: string | null
           status?: string
           title?: string
           user_id: string
@@ -167,13 +170,13 @@ export type Database = {
           detection_confidence?: string | null
           detection_source?: string | null
           ended_at?: string | null
-          ide?: string | null
-          pid?: number | null
-          started_at?: string | null
           external_id?: string
           id?: string
+          ide?: string | null
           last_activity_at?: string
+          pid?: number | null
           source?: string
+          started_at?: string | null
           status?: string
           title?: string
           user_id?: string
