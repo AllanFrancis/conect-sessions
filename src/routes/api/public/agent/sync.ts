@@ -6,17 +6,20 @@ const bodySchema = z.object({
   session: z.object({
     external_id: z.string().min(1).max(200),
     source: z.string().min(1).max(40).default("unknown"),
-    title: z.string().max(200).optional(),
-    cwd: z.string().max(500).optional(),
-    status: z.enum(["running", "waiting", "idle", "done", "error"]).default("idle"),
+    title: z.string().max(200).nullish(),
+    cwd: z.string().max(500).nullish(),
+    status: z
+      .enum(["running", "waiting", "idle", "done", "error"])
+      .nullish()
+      .transform((v) => v ?? "idle"),
   }),
   messages: z
     .array(
       z.object({
-        external_id: z.string().max(200).optional(),
-        role: z.string().max(40).default("assistant"),
-        content: z.string().max(200000).default(""),
-        seq: z.number().int().optional(),
+        external_id: z.string().max(200).nullish(),
+        role: z.string().max(40).nullish().transform((v) => v ?? "assistant"),
+        content: z.string().max(200000).nullish().transform((v) => v ?? ""),
+        seq: z.number().int().nullish(),
       }),
     )
     .max(200)
