@@ -1,13 +1,13 @@
 # SPEC-20260905-1944: sessao layout mobile
 
-**Status:** active
+**Status:** done
 **Porte:** M
 **Owner:** @AllanFrancis
 **Criada:** 2026-09-05 19:44
 **Ativada:** 2026-09-05 19:44
-**Concluída:** —
+**Concluída:** 2026-09-05 19:55
 **Pausada em:** —
-**Commit final:** —
+**Commit final:** `9022a38`
 **Keywords:** dashboard
 **Features:** dashboard
 **Branch:** feat/sessao-layout-mobile
