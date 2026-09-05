@@ -58,10 +58,50 @@ const HOME = os.homedir();
 const APP_DATA = process.env.APPDATA || path.join(HOME, "AppData", "Roaming");
 const IS_WIN = process.platform === "win32";
 
-const CLAUDE_HOME = path.join(HOME, ".claude");
-const CLAUDE_SESSIONS_DIR = path.join(CLAUDE_HOME, "sessions"); // <pid>.json
-const CLAUDE_IDE_DIR = path.join(CLAUDE_HOME, "ide"); // <porta>.lock
-const CLAUDE_PROJECTS_DIR = path.join(CLAUDE_HOME, "projects"); // <cwd-codificado>/<sessionId>.jsonl
+/**
+ * Caminho para comparar. Vem de env, de disco e de JSON escrito por terceiros,
+ * então misturar `/` com `\` é a regra, não a exceção — e no Windows a mesma
+ * pasta aparece com caixas diferentes. Sem normalizar, `D:\VSCode…` não casa
+ * com `D:/VSCode…` e o arquivo é descartado como se fosse de outro programa.
+ */
+function pathKey(p) {
+  const abs = path.resolve(p).replace(/[\\/]+$/, "");
+  return IS_WIN ? abs.replaceAll("\\", "/").toLowerCase() : abs;
+}
+
+/**
+ * Onde o Claude Code guarda o que lemos. Quem manda nisso é `CLAUDE_CONFIG_DIR`
+ * (que aceita mais de um caminho, separados por vírgula); sem ela vale
+ * `~/.claude`, que é o caso da maioria das máquinas.
+ *
+ * É LISTA, não caminho único, por dois motivos. O primeiro é o bug que originou
+ * isto: com `~/.claude` fixo, uma máquina com a variável apontando para outro
+ * disco tinha TODAS as transcrições classificadas como `unknown` e puladas — o
+ * painel mostrava a sessão viva com a conversa vazia (medido em 2026-09-05: 15
+ * transcrições do dia invisíveis). O segundo é que quem já sincronizou por
+ * `~/.claude` não pode perder o histórico só porque a variável passou a existir.
+ */
+const CLAUDE_HOMES = (() => {
+  const brutos = [
+    ...(process.env.CLAUDE_CONFIG_DIR || "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean),
+    path.join(HOME, ".claude"),
+  ];
+  const vistos = new Set();
+  return brutos.filter((dir) => {
+    const chave = pathKey(dir);
+    if (vistos.has(chave)) return false;
+    vistos.add(chave);
+    return fs.existsSync(dir);
+  });
+})();
+
+const CLAUDE_SESSIONS_DIRS = CLAUDE_HOMES.map((h) => path.join(h, "sessions")); // <pid>.json
+const CLAUDE_IDE_DIRS = CLAUDE_HOMES.map((h) => path.join(h, "ide")); // <porta>.lock
+const CLAUDE_PROJECTS_DIRS = CLAUDE_HOMES.map((h) => path.join(h, "projects")); // <cwd-codificado>/<sessionId>.jsonl
+const CLAUDE_PROJECTS_KEYS = CLAUDE_PROJECTS_DIRS.map(pathKey);
 
 // Estado compartilhado com o hook do Claude Code (public/agent/claude-hook.mjs).
 // É por aqui que a resposta do painel entra numa sessão que roda sem terminal:
@@ -275,29 +315,44 @@ function emptySession(agent, sessionId) {
  * elimina reuso de PID.
  */
 
-/** Lê os locks de IDE: ~/.claude/ide/<porta>.lock -> pid da IDE, nome, workspaces. */
+/** Lê os locks de IDE: <config>/ide/<porta>.lock -> pid da IDE, nome, workspaces. */
 function claudeIdeLocks() {
   const out = [];
-  for (const entry of listDir(CLAUDE_IDE_DIR)) {
-    if (!entry.isFile() || !entry.name.endsWith(".lock")) continue;
-    const data = readJson(path.join(CLAUDE_IDE_DIR, entry.name));
-    if (!data || typeof data.pid !== "number") continue;
-    out.push({
-      port: entry.name.replace(/\.lock$/, ""),
-      pid: data.pid,
-      ideName: typeof data.ideName === "string" ? data.ideName : null,
-      workspaceFolders: Array.isArray(data.workspaceFolders) ? data.workspaceFolders : [],
-    });
+  for (const dir of CLAUDE_IDE_DIRS) {
+    for (const entry of listDir(dir)) {
+      if (!entry.isFile() || !entry.name.endsWith(".lock")) continue;
+      const data = readJson(path.join(dir, entry.name));
+      if (!data || typeof data.pid !== "number") continue;
+      out.push({
+        port: entry.name.replace(/\.lock$/, ""),
+        pid: data.pid,
+        ideName: typeof data.ideName === "string" ? data.ideName : null,
+        workspaceFolders: Array.isArray(data.workspaceFolders) ? data.workspaceFolders : [],
+      });
+    }
+  }
+  return out;
+}
+
+/** Registros `<pid>.json` de todas as configs do Claude Code, achatados num só. */
+function claudeRegistryFiles() {
+  const out = [];
+  for (const dir of CLAUDE_SESSIONS_DIRS) {
+    for (const entry of listDir(dir)) {
+      if (entry.isFile() && entry.name.endsWith(".json")) out.push(path.join(dir, entry.name));
+    }
   }
   return out;
 }
 
 /** Localiza a transcrição de uma sessão sem depender da codificação do nome da pasta. */
 function claudeTranscriptFor(sessionId) {
-  for (const entry of listDir(CLAUDE_PROJECTS_DIR)) {
-    if (!entry.isDirectory()) continue;
-    const candidate = path.join(CLAUDE_PROJECTS_DIR, entry.name, `${sessionId}.jsonl`);
-    if (fs.existsSync(candidate)) return candidate;
+  for (const dir of CLAUDE_PROJECTS_DIRS) {
+    for (const entry of listDir(dir)) {
+      if (!entry.isDirectory()) continue;
+      const candidate = path.join(dir, entry.name, `${sessionId}.jsonl`);
+      if (fs.existsSync(candidate)) return candidate;
+    }
   }
   return null;
 }
@@ -307,9 +362,7 @@ function detectClaudeSessions(snap, pipes) {
   const locks = claudeIdeLocks();
   const liveLocks = locks.filter((l) => !snap.degraded && snap.byPid.has(l.pid));
 
-  for (const entry of listDir(CLAUDE_SESSIONS_DIR)) {
-    if (!entry.isFile() || !entry.name.endsWith(".json")) continue;
-    const file = path.join(CLAUDE_SESSIONS_DIR, entry.name);
+  for (const file of claudeRegistryFiles()) {
     const reg = readJson(file);
     if (!reg || typeof reg.sessionId !== "string" || typeof reg.pid !== "number") continue;
 
@@ -886,7 +939,7 @@ const EXTRA_DIRS = (process.env.LRC_WATCH || "")
   .filter(Boolean);
 
 const DEFAULT_DIRS = [
-  CLAUDE_PROJECTS_DIR,
+  ...CLAUDE_PROJECTS_DIRS,
   KIRO_SESSIONS_DIR,
   path.join(KIRO_HOME, "spec-sessions"),
 ];
@@ -906,8 +959,12 @@ function walk(dir, out = []) {
 }
 
 function sourceOf(file) {
-  if (file.startsWith(CLAUDE_PROJECTS_DIR)) return "claude-code";
-  if (file.startsWith(KIRO_HOME)) return "kiro";
+  // Prefixo com separador no fim, e não `startsWith` cru: `~/.claude-backup`
+  // não é `~/.claude`, e classificar errado manda a transcrição para o
+  // adaptador de outra IDE.
+  const chave = pathKey(file);
+  if (CLAUDE_PROJECTS_KEYS.some((d) => chave.startsWith(`${d}/`))) return "claude-code";
+  if (chave.startsWith(`${pathKey(KIRO_HOME)}/`)) return "kiro";
   return "unknown";
 }
 

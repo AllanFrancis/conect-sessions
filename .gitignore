@@ -45,3 +45,6 @@ supabase/.branches/
 skills-lock.json
 .claude/skills/supabase/
 .claude/skills/supabase-postgres-best-practices/
+
+# saída do Playwright MCP (snapshots/console de teste manual)
+.playwright-mcp/
