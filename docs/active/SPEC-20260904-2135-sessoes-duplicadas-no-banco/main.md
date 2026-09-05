@@ -46,14 +46,36 @@ Fase 1 é medição, com SQL de leitura no banco real:
 - Se as duplicatas têm mensagens nos dois lados ou só num.
 - Se os agentes duplicados são reinstalações (token novo) ou cópias simultâneas.
 
-Só então decidir entre: chave por `(user_id, external_id)`; consolidar agentes da mesma máquina por uma identidade estável de host; ou tratar como apresentação, agrupando na UI sem tocar no banco. A escolha muda RLS e índices, então vai decidida no contrato antes de codar.
+**Fase 1 fechada em 2026-09-05 16:50** (medição no banco real — ver journal). A causa está provada:
+dois registros de agente do MESMO usuário na MESMA máquina, criados com 3 minutos de diferença e
+vivos ao mesmo tempo (`last_seen_at` a 15s um do outro), lendo os mesmos arquivos de transcrição.
+Não é reinstalação com agente velho para trás.
+
+**Decisão: chave por `(user_id, external_id)`.** As outras duas caíram por medição, não por gosto:
+
+- "identidade estável de host" exigiria o agente mandar algo que identifique a máquina — e `agents`
+  não tem campo nenhum para isso. É mudança de payload, que é FORA por invariante.
+- "unicidade por `external_id`" fundiria `kiro:sess_169703b9-...`, que existe sob DOIS `user_id`
+  diferentes. Seria vazar sessão de um usuário no painel do outro.
+
+**A mudança é menor do que este contrato supunha:** `sessions.user_id` JÁ existe, preenchido nas 48
+linhas, sem nenhuma divergência contra `agents.user_id`. Não há desnormalização a fazer. Sobra:
+
+1. consolidar as 12 duplicatas (as duas metades têm conjuntos de mensagem IDÊNTICOS por
+   `external_id` — é remoção de cópia, não fusão de conteúdo);
+2. trocar `UNIQUE (agent_id, external_id)` por `UNIQUE (user_id, external_id)`;
+3. trocar o `onConflict` do upsert em `sync.ts` para `user_id,external_id`.
+
+O `agent_id` continua na linha e continua sendo mostrado: saber por qual agente a sessão entrou é
+informação, e a última escrita ganha — que é o comportamento certo quando duas cópias do agente
+sincronizam a mesma sessão.
 
 ### Modelo de dados
 
 | Entidade | Campos / mudança |
 |---|---|
-| `sessions` | Possível mudança de unicidade (`agent_id` + `external_id` → outra chave) e do índice que a sustenta. A definir na fase 1. |
-| `agents` | Talvez uma identidade estável de máquina, se a causa for reinstalação do agente. A definir. |
+| `sessions` | `UNIQUE (agent_id, external_id)` → `UNIQUE (user_id, external_id)`. `user_id` já existe e já é escrito pelo `/sync`; nenhuma coluna nova. Migração consolida as duplicatas ANTES de criar a constraint. |
+| `agents` | Nenhuma mudança. Identidade de máquina exigiria mudar o payload, que é FORA. |
 
 ## Riscos
 

@@ -119,7 +119,12 @@ export const Route = createFileRoute("/api/public/agent/sync")({
               // fallback para quando ele não consegue medir.
               last_activity_at: parsed.session.last_activity_at ?? now,
             },
-            { onConflict: "agent_id,external_id" },
+            // A identidade da sessão é (user_id, external_id), não o agente:
+            // duas cópias do agente na mesma máquina têm tokens diferentes e
+            // criavam duas linhas para a MESMA sessão de IA. O agent_id segue
+            // gravado — por onde a sessão entrou é informação — mas quem chega
+            // depois atualiza a linha existente em vez de duplicá-la.
+            { onConflict: "user_id,external_id" },
           )
           .select("id")
           .single();

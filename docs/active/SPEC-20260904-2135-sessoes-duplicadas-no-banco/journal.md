@@ -2,7 +2,7 @@
 
 ## SNAPSHOT (sobrescrever — DEVE caber nas primeiras 60 linhas do arquivo)
 
-**Última atualização:** 2026-09-05 16:44
+**Última atualização:** 2026-09-05 16:48
 **Onde tô:** início — nada feito ainda
 **Próximo passo:** <primeiro passo concreto>
 **Última decisão:** —
@@ -100,3 +100,30 @@ código, como o main.md manda.
 uuid (Claude e Kiro), então colisão por acaso não acontece; o caso real seria um `~/.claude` copiado
 entre máquinas. Não medi — só tenho uma máquina no banco por usuário.
 ⎿ commit f159ab5
+
+## 2026-09-05 16:48 — [decisão] Chave (user_id, external_id); migracao escrita e NAO aplicada — aplicar em producao e decisao do usuario
+
+**Decisão registrada no contrato:** identidade de sessão passa a ser `(user_id, external_id)`.
+As outras duas opções caíram por medição, não por preferência — ver a [descoberta] de 16:44.
+
+**A mudança é menor do que o contrato supunha.** `sessions.user_id` JÁ existe, já é escrito pelo
+`/sync` e está íntegro: 48/48 preenchidos, zero divergência contra `agents.user_id`. Não há coluna
+nova nem desnormalização.
+
+**Escrito nesta rodada:**
+
+- `supabase/migrations/20260905205500_sessao_unica_por_usuario.sql` — consolida, depois troca a
+  constraint. Nessa ordem: criar a chave antes de consolidar falharia com as 12 duplicatas vivas.
+  O sobrevivente de cada grupo é o mais antigo; mensagens migram com `NOT EXISTS` porque
+  `messages` tem `UNIQUE (session_id, external_id)` e as duas metades são cópias exatas — sem o
+  guarda o UPDATE quebraria na primeira linha. `replies` migram todas: não têm chave por conteúdo, e
+  perder uma resposta pendente seria perder uma fala que o painel já disse ter entregue.
+- `sync.ts`: `onConflict` de `agent_id,external_id` para `user_id,external_id`. Payload intacto —
+  nada mudou no corpo da requisição nem no fluxo, só o alvo do upsert.
+
+**NÃO apliquei a migração.** Ela apaga linhas em produção e a operação não tem volta pelo mesmo
+caminho. Os dois passos precisam entrar juntos — o `onConflict` novo aponta para uma constraint que
+ainda não existe no banco, então subir só o código quebra o `/sync`. Fica para o usuário autorizar.
+
+Typecheck e lint limpos com a mudança de código.
+⎿ commit d6f6f4c+dirty · 2 files changed, 31 insertions(+), 4 deletions(-)
