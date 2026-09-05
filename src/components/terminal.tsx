@@ -1,12 +1,133 @@
 import { cn } from "@/lib/utils";
 import { useState } from "react";
-import type { ButtonHTMLAttributes, ReactNode } from "react";
+import type { ButtonHTMLAttributes, ReactNode, RefObject } from "react";
 import { toast } from "sonner";
 
 /** Container central com o respiro típico de um terminal. */
 export function TermScreen({ children, className }: { children: ReactNode; className?: string }) {
   return (
     <main className={cn("mx-auto w-full max-w-4xl px-4 py-6 text-sm", className)}>{children}</main>
+  );
+}
+
+/**
+ * Barra fixa do topo em página de conversa: voltar, título centralizado, ação.
+ *
+ * O título fica no centro e truncado em uma linha porque no celular ele briga
+ * com os dois botões pelo mesmo espaço — deixar quebrar empurraria a conversa
+ * para baixo a cada sessão de nome comprido. O subtítulo carrega o contexto
+ * (projeto, estado) que não cabe no título.
+ */
+export function TermTopBar({
+  left,
+  title,
+  subtitle,
+  right,
+}: {
+  left?: ReactNode;
+  title: ReactNode;
+  subtitle?: ReactNode;
+  right?: ReactNode;
+}) {
+  return (
+    <header className="sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur-sm">
+      <div className="mx-auto flex w-full max-w-4xl items-center gap-2 px-2 py-2">
+        <div className="flex size-9 shrink-0 items-center justify-center">{left}</div>
+        <div className="min-w-0 flex-1 text-center">
+          <p className="truncate text-foreground">{title}</p>
+          {subtitle && <p className="mt-0.5 truncate text-xs text-muted-foreground">{subtitle}</p>}
+        </div>
+        <div className="flex size-9 shrink-0 items-center justify-center">{right}</div>
+      </div>
+    </header>
+  );
+}
+
+/** Botão redondo da barra/composer, do tamanho que um polegar acerta (44px). */
+export function TermIconButton({
+  children,
+  className,
+  label,
+  ...props
+}: ButtonHTMLAttributes<HTMLButtonElement> & { label: string }) {
+  return (
+    <button
+      {...props}
+      title={label}
+      aria-label={label}
+      className={cn(
+        "inline-flex size-9 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground disabled:opacity-40",
+        className,
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+/**
+ * Bolha da fala do usuário, encostada à direita.
+ *
+ * `max-w` de 85% em vez de largura cheia: é o que faz o lado direito ser lido
+ * como "isto foi você", sem precisar de rótulo. E `break-words` porque a fala
+ * do usuário frequentemente é um caminho ou um comando sem espaço, que estoura
+ * a linha num viewport de 360px.
+ */
+export function ChatBubble({
+  children,
+  className,
+  tone = "user",
+}: {
+  children: ReactNode;
+  className?: string;
+  tone?: "user" | "pending";
+}) {
+  return (
+    <div className="flex justify-end">
+      <div
+        className={cn(
+          "max-w-[85%] rounded-2xl px-4 py-2.5 wrap-anywhere whitespace-pre-wrap",
+          tone === "pending"
+            ? "border border-dashed border-primary/50 bg-secondary/50 text-muted-foreground"
+            : "bg-secondary text-foreground",
+          className,
+        )}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Linha discreta que resume algo dobrado e abre ao toque ("Executou 8 comandos ›").
+ *
+ * Ferramenta é ruído até você querer o detalhe: fechada ela é uma linha, aberta
+ * é o log inteiro. O chevron gira para dizer qual dos dois estados está valendo,
+ * porque só a palavra "saída" não diz se há algo escondido ali.
+ */
+export function CollapsedRow({
+  summary,
+  children,
+  tone = "muted",
+}: {
+  summary: ReactNode;
+  children?: ReactNode;
+  tone?: "muted" | "danger";
+}) {
+  return (
+    <details className="group">
+      <summary
+        className={cn(
+          "flex cursor-pointer list-none items-center gap-1.5 py-1 text-sm transition-colors marker:content-none hover:text-foreground",
+          tone === "danger" ? "text-destructive" : "text-muted-foreground",
+        )}
+      >
+        <span className="min-w-0 flex-1 truncate">{summary}</span>
+        <span className="shrink-0 select-none transition-transform group-open:rotate-90">›</span>
+      </summary>
+      {children && <div className="pb-1">{children}</div>}
+    </details>
   );
 }
 
@@ -150,6 +271,83 @@ export function TermHints({ items }: { items: string[] }) {
         </span>
       ))}
     </p>
+  );
+}
+
+/**
+ * Composer fixo no rodapé: pílula com o campo que cresce e a fileira de ações.
+ *
+ * Fica preso embaixo com a área segura somada ao padding — sem isso, no iPhone
+ * a barra de gestos come o botão de enviar, e quem está no celular fica com a
+ * mensagem escrita e sem como mandar.
+ *
+ * O Enter envia e o Shift+Enter quebra linha, como no CLI. No celular o teclado
+ * manda um Enter "solto" a cada nova linha desejada, então o `enterKeyHint`
+ * avisa o teclado que aquela tecla envia — sem isso a pessoa escreve um
+ * parágrafo e o manda picado em cinco respostas.
+ */
+export function TermComposer({
+  value,
+  onChange,
+  onSend,
+  disabled,
+  placeholder,
+  hint,
+  inputRef,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  onSend: () => void;
+  disabled?: boolean;
+  placeholder?: string;
+  hint?: ReactNode;
+  inputRef?: RefObject<HTMLTextAreaElement | null>;
+}) {
+  const vazio = !value.trim();
+  return (
+    <div
+      className="sticky bottom-0 z-20 border-t border-border bg-background px-3 pt-2"
+      style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 0.75rem)" }}
+    >
+      <div className="mx-auto w-full max-w-4xl rounded-3xl border border-border bg-card px-4 py-2.5 focus-within:border-primary/70">
+        <textarea
+          ref={inputRef}
+          value={value}
+          rows={1}
+          enterKeyHint="send"
+          placeholder={placeholder}
+          className="max-h-40 min-h-7 w-full resize-none bg-transparent py-1 text-foreground outline-none placeholder:text-muted-foreground"
+          onChange={(e) => onChange(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              onSend();
+            }
+          }}
+        />
+        <div className="flex items-center gap-2 pt-1">
+          <div className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{hint}</div>
+          <button
+            type="button"
+            disabled={disabled || vazio}
+            onClick={onSend}
+            aria-label="Enviar resposta"
+            className="inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground transition-opacity disabled:opacity-30"
+          >
+            <svg viewBox="0 0 24 24" className="size-4" aria-hidden="true">
+              <path
+                d="M12 19V5M5 12l7-7 7 7"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 

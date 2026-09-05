@@ -1,16 +1,28 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import {
+  ChatBubble,
+  CollapsedRow,
   SourceIcon,
   StatusDot,
   TermBox,
   TermButton,
   TermCode,
-  TermScreen,
+  TermComposer,
+  TermIconButton,
   TermTag,
+  TermTopBar,
 } from "@/components/terminal";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Markdown } from "@/components/markdown";
 import { projectName, sessionTitle } from "@/lib/session-display";
 import { parseChoices } from "@/lib/parse-choices";
@@ -143,9 +155,12 @@ function SessionPage() {
     },
   });
 
+  // Também nas respostas pendentes, não só nas mensagens: quem envia do celular
+  // precisa VER a própria bolha aparecer. Observando só `messages`, o que você
+  // acabou de mandar nasce fora da tela, atrás do composer.
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [data?.messages.length]);
+  }, [data?.messages.length, data?.replies.length]);
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -187,14 +202,20 @@ function SessionPage() {
     if (meta?.answers_tool_use_id) answeredBy.set(meta.answers_tool_use_id, meta);
   }
 
+  const status = session?.status ?? "idle";
+
   return (
-    <TermScreen className="flex min-h-screen flex-col">
-      <TermBox tone="accent" className="px-4 py-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <Link to="/dashboard">
-            <TermButton variant="ghost">← Voltar</TermButton>
+    // `dvh` e não `vh`: no celular a barra do navegador entra e sai, e `vh`
+    // congela na altura da barra escondida — o composer acabaria fora da tela.
+    <div className="flex h-dvh flex-col bg-background text-sm">
+      <TermTopBar
+        left={
+          <Link to="/dashboard" aria-label="Voltar para as sessões">
+            <TermIconButton label="Voltar">←</TermIconButton>
           </Link>
-          <p className="flex min-w-0 flex-1 items-center gap-2 truncate text-primary">
+        }
+        title={
+          <span className="inline-flex min-w-0 items-center gap-2 align-middle">
             <SourceIcon source={session?.source} />
             <span className="truncate">
               {sessionTitle(
@@ -203,15 +224,13 @@ function SessionPage() {
                 session?.cwd,
               )}
             </span>
-          </p>
-        </div>
-        <p className="mt-1 flex items-center gap-2 truncate text-xs text-muted-foreground">
-          <StatusDot status={session?.status ?? "idle"} />
-          {session?.status ?? "…"} · {projectName(session?.cwd, session?.title)}
-        </p>
-      </TermBox>
+          </span>
+        }
+        subtitle={projectName(session?.cwd, session?.title)}
+        right={<SessionMenu status={status} />}
+      />
 
-      <div className="flex-1 space-y-3 overflow-y-auto py-4">
+      <div className="mx-auto w-full max-w-4xl flex-1 space-y-4 overflow-y-auto px-3 py-4">
         {messages.map((m) => {
           const meta = readMeta(m.meta);
 
@@ -260,15 +279,10 @@ function SessionPage() {
             return <ToolBlock key={m.id} tool={meta.tool} output={m.content} />;
           }
 
+          // A fala do usuário vira bolha à direita: é o que faz "isto foi você"
+          // ser lido de relance no celular, sem rótulo e sem marcador.
           if (m.role === "user") {
-            return (
-              <div key={m.id} className="flex gap-2">
-                <span className="select-none text-primary">&gt;</span>
-                <div className="min-w-0 flex-1 whitespace-pre-wrap text-foreground">
-                  {m.content}
-                </div>
-              </div>
-            );
+            return <ChatBubble key={m.id}>{m.content}</ChatBubble>;
           }
 
           // O Kiro grava pensamento e fala com o mesmo papel; quem separa é o
@@ -278,76 +292,124 @@ function SessionPage() {
           // responder, é o modelo falando consigo mesmo.
           const reasoning = meta?.kind === "reasoning";
           const choices = reasoning ? null : parseChoices(m.content);
+
+          // Raciocínio continua dobrado e rotulado: é o modelo falando consigo
+          // mesmo, e aberto por padrão ele afoga a fala de verdade no celular.
+          if (reasoning) {
+            return (
+              <CollapsedRow key={m.id} summary="Raciocínio do agente">
+                <div className="pt-1 pl-1 text-muted-foreground opacity-80">
+                  <Markdown content={m.content} />
+                </div>
+              </CollapsedRow>
+            );
+          }
+
+          // Fala do agente em largura cheia, sem bolha e sem marcador: é o lado
+          // que carrega markdown longo, e bolha estreitaria a leitura à toa.
           return (
-            <div key={m.id} className={reasoning ? "flex gap-2 opacity-60" : "flex gap-2"}>
-              <span className="select-none text-primary">{reasoning ? "·" : "⏺"}</span>
-              <div className="min-w-0 flex-1 text-muted-foreground">
-                {reasoning && <TermTag className="mb-1">raciocínio</TermTag>}
-                <Markdown content={m.content} />
-                {choices && (
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {choices.map((c) => (
-                      <TermButton
-                        key={c}
-                        variant="ghost"
-                        onClick={() => {
-                          setReply(c);
-                          inputRef.current?.focus();
-                        }}
-                      >
-                        {c}
-                      </TermButton>
-                    ))}
-                  </div>
-                )}
-              </div>
+            <div key={m.id} className="text-foreground">
+              <Markdown content={m.content} />
+              {choices && (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {choices.map((c) => (
+                    <TermButton
+                      key={c}
+                      variant="ghost"
+                      onClick={() => {
+                        setReply(c);
+                        inputRef.current?.focus();
+                      }}
+                    >
+                      {c}
+                    </TermButton>
+                  ))}
+                </div>
+              )}
             </div>
           );
         })}
+        {/* Resposta ainda não entregue: mesma bolha, tracejada. O painel garante
+            envio ao agente, não que o terminal já a recebeu — a bolha diz isso. */}
         {(data?.replies ?? [])
           .filter((r) => r.status === "pending")
           .map((r) => (
-            <div key={r.id} className="flex gap-2 opacity-70">
-              <span className="select-none text-primary">&gt;</span>
-              <div className="min-w-0 flex-1">
-                <span className="whitespace-pre-wrap text-foreground">{r.content}</span>
-                <span className="ml-2 text-xs text-muted-foreground">✳ enviando…</span>
-              </div>
-            </div>
+            <ChatBubble key={r.id} tone="pending">
+              {r.content}
+              <span className="mt-1 block text-xs">✳ enviada ao agente…</span>
+            </ChatBubble>
           ))}
         <div ref={bottomRef} />
       </div>
 
-      <div className="sticky bottom-0 bg-background pt-2 pb-4">
-        <div className="flex items-end gap-2 rounded-md border border-border bg-card px-3 py-2 focus-within:border-primary/70">
-          <span className="pb-1 select-none text-primary">&gt;</span>
-          <textarea
-            ref={inputRef}
-            value={reply}
-            rows={1}
-            placeholder="Responder ao agente…"
-            className="max-h-40 min-h-6 flex-1 resize-none bg-transparent py-1 text-foreground outline-none placeholder:text-muted-foreground"
-            onChange={(e) => setReply(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                void send();
-              }
-            }}
-          />
-          <TermButton
-            variant="primary"
-            disabled={sending || !reply.trim()}
-            onClick={() => void send()}
-          >
-            {sending ? "Enviando…" : "Enviar"}
-          </TermButton>
-        </div>
-        <p className="mt-2 text-xs text-muted-foreground">
-          enter envia · shift+enter nova linha · atualiza a cada 2s
-        </p>
-      </div>
-    </TermScreen>
+      <TermComposer
+        value={reply}
+        onChange={setReply}
+        onSend={() => void send()}
+        disabled={sending}
+        placeholder="Responder ao agente…"
+        inputRef={inputRef}
+        hint={
+          sending ? (
+            "enviando…"
+          ) : (
+            <span className="inline-flex items-center gap-1.5">
+              <StatusDot status={status} />
+              {status} · atualiza a cada 2s
+            </span>
+          )
+        }
+      />
+    </div>
+  );
+}
+
+/**
+ * Menu do canto: só entra o que tem ação de verdade.
+ *
+ * O print que originou este layout tem um `⋮` ali. Copiar o desenho com um menu
+ * vazio seria afordância mentirosa — então ele carrega o que realmente serve na
+ * página de uma sessão: copiar o link (para mandar para outra máquina), ir para
+ * os tokens e sair. O estado da sessão vai junto, porque no celular o subtítulo
+ * já está ocupado pelo projeto.
+ */
+function SessionMenu({ status }: { status: string }) {
+  const navigate = useNavigate();
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <TermIconButton label="Mais ações">⋮</TermIconButton>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56">
+        <DropdownMenuLabel className="flex items-center gap-1.5 font-normal text-muted-foreground">
+          <StatusDot status={status} />
+          {status}
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          onClick={() => {
+            navigator.clipboard
+              .writeText(window.location.href)
+              .then(() => toast.success("Link copiado"))
+              .catch(() => toast.error("Não foi possível copiar"));
+          }}
+        >
+          Copiar link da sessão
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => void navigate({ to: "/agents" })}>
+          Máquinas &amp; tokens
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          onClick={async () => {
+            await supabase.auth.signOut();
+            void navigate({ to: "/auth" });
+          }}
+        >
+          Sair
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -365,40 +427,23 @@ function ToolBlock({ tool, output }: { tool: ToolMeta; output: string }) {
   const failed = tool.ok === false;
   const label = tool.title || tool.name || "ferramenta";
   return (
-    <div className="flex gap-2">
-      <span className="select-none text-primary">⚒</span>
-      <div className="min-w-0 flex-1">
-        <TermBox className={failed ? "space-y-1.5 border-destructive/70" : "space-y-1.5"}>
-          <div className="flex items-center gap-2">
-            <span className="shrink-0 text-foreground">{label}</span>
-            {tool.target && (
-              <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
-                {tool.target}
-              </span>
-            )}
-            <span
-              className={
-                failed
-                  ? "ml-auto shrink-0 text-xs text-destructive"
-                  : "ml-auto shrink-0 text-xs text-muted-foreground"
-              }
-            >
-              {failed ? "falhou" : "ok"}
-            </span>
-          </div>
-          {output.trim() && (
-            <details>
-              <summary className="cursor-pointer text-xs text-muted-foreground">
-                saída{tool.truncated ? " (cortada pelo agente)" : ""}
-              </summary>
-              <div className="mt-1.5">
-                <TermCode language={tool.name ?? "saída"} code={output} />
-              </div>
-            </details>
-          )}
-        </TermBox>
-      </div>
-    </div>
+    <CollapsedRow
+      tone={failed ? "danger" : "muted"}
+      summary={
+        <>
+          {label}
+          {tool.target && <span className="opacity-70"> · {tool.target}</span>}
+          {failed && <span className="text-destructive"> · falhou</span>}
+        </>
+      }
+    >
+      {output.trim() ? (
+        <TermCode language={tool.name ?? "saída"} code={output} />
+      ) : (
+        <p className="py-1 text-xs text-muted-foreground">sem saída</p>
+      )}
+      {tool.truncated && <p className="text-xs text-muted-foreground">saída cortada pelo agente</p>}
+    </CollapsedRow>
   );
 }
 

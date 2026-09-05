@@ -1,16 +1,27 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { SourceIcon, StatusDot, TermHints, TermIconButton } from "@/components/terminal";
 import {
-  SourceIcon,
-  StatusDot,
-  TermBox,
-  TermButton,
-  TermHints,
-  TermScreen,
-  termLinkClass,
-} from "@/components/terminal";
-import { projectName, sessionTitle } from "@/lib/session-display";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { projectName, relativeTime, sessionTitle } from "@/lib/session-display";
+import { cn } from "@/lib/utils";
+
+/**
+ * A palavra do estado ganha a cor do estado, como o marcador já tem.
+ *
+ * Num cartão a pessoa lê a palavra antes do símbolo; deixar as duas coisas
+ * dizendo a mesma coisa é o que faz "está rodando" saltar sem precisar
+ * procurar. Só `active` recebe destaque — se tudo destacasse, nada destacaria.
+ */
+function statusTone(status: string): string {
+  return status === "active" || status === "running" ? "text-primary" : "";
+}
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({
@@ -67,83 +78,111 @@ function Dashboard() {
   const firstMessages = data?.firstMessages ?? {};
 
   return (
-    <TermScreen>
-      <TermBox tone="accent" className="px-4 py-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-primary">✻ Sessões ao vivo</p>
-          <div className="flex items-center gap-2">
-            <Link to="/agents" className={termLinkClass}>
-              Máquinas & tokens
-            </Link>
-            <TermButton
-              variant="danger"
-              onClick={async () => {
-                await supabase.auth.signOut();
-                navigate({ to: "/auth" });
-              }}
-            >
-              Sair
-            </TermButton>
-          </div>
+    <div className="min-h-dvh bg-background text-sm">
+      <div className="mx-auto w-full max-w-4xl px-4 pt-3 pb-10">
+        <div className="flex items-center justify-between">
+          <h1 className="text-3xl font-semibold tracking-tight text-foreground">Sessões</h1>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <TermIconButton label="Menu">☰</TermIconButton>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-52">
+              <DropdownMenuItem onClick={() => void navigate({ to: "/agents" })}>
+                Máquinas &amp; tokens
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={async () => {
+                  await supabase.auth.signOut();
+                  void navigate({ to: "/auth" });
+                }}
+              >
+                Sair
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
-        <p className="mt-1 text-xs text-muted-foreground">
-          atualiza a cada 3s · {sessions.length} sessão(ões) ativa(s)
-        </p>
-      </TermBox>
 
-      <div className="mt-4 space-y-2">
-        {isLoading ? (
-          <p className="text-muted-foreground">✳ Carregando…</p>
-        ) : sessions.length === 0 ? (
-          <TermBox className="text-muted-foreground">
-            <p className="text-foreground">Nenhuma sessão ativa agora.</p>
-            <p className="mt-1">
-              O painel lista apenas sessões rodando neste momento. Crie um token em{" "}
-              <Link to="/agents" className="text-primary hover:underline">
-                Máquinas & tokens
-              </Link>{" "}
-              e rode o agente local na máquina do editor.
-            </p>
-          </TermBox>
-        ) : (
-          sessions.map((s) => (
-            <Link
-              key={s.id}
-              to="/sessions/$sessionId"
-              params={{ sessionId: s.id }}
-              className="block rounded-md border border-border bg-card px-3 py-2.5 transition-colors hover:border-primary/70"
-            >
-              <div className="flex items-center gap-2">
-                <StatusDot status={s.status} />
-                <SourceIcon source={s.source} />
-                <span className="min-w-0 flex-1 truncate font-medium text-foreground">
-                  {sessionTitle(s.title, firstMessages[s.id], s.cwd)}
-                </span>
-                <span className="shrink-0 text-xs text-muted-foreground">
-                  {new Date(s.last_activity_at).toLocaleTimeString()}
-                </span>
+        <section className="mt-6">
+          <h2 className="text-muted-foreground">Máquinas</h2>
+          <Link
+            to="/agents"
+            className="mt-2 inline-flex items-center gap-2 rounded-full border border-border bg-card px-4 py-2.5 text-foreground transition-colors hover:border-primary/70"
+          >
+            <span className="select-none text-lg leading-none">+</span>
+            Adicionar máquina
+          </Link>
+        </section>
+
+        <section className="mt-6">
+          <div className="flex items-baseline justify-between gap-2">
+            <h2 className="text-muted-foreground">Sessões ativas</h2>
+            {/* O painel lista SÓ sessão ativa (SPEC-20260904-1433) — dizer isso aqui
+                evita a leitura de que a lista está vazia por falta de sessão. */}
+            <span className="text-xs text-muted-foreground">atualiza a cada 3s</span>
+          </div>
+
+          <div className="mt-2 space-y-2">
+            {isLoading ? (
+              <p className="text-muted-foreground">✳ Carregando…</p>
+            ) : sessions.length === 0 ? (
+              <div className="rounded-2xl border border-border bg-card px-4 py-4 text-muted-foreground">
+                <p className="text-foreground">Nenhuma sessão ativa agora.</p>
+                <p className="mt-1">
+                  O painel lista apenas sessões rodando neste momento. Crie um token em{" "}
+                  <Link to="/agents" className="text-primary hover:underline">
+                    Máquinas &amp; tokens
+                  </Link>{" "}
+                  e rode o agente local na máquina do editor.
+                </p>
               </div>
-              <p className="mt-0.5 truncate pl-[3.25rem] text-xs text-muted-foreground">
-                {projectName(s.cwd, s.title)} · {s.status}
-                {s.ide ? ` · ${s.ide}` : " · IDE desconhecida"}
-                {s.pid ? ` · pid ${s.pid}` : ""}
-                {s.detection_confidence && s.detection_confidence !== "confirmed"
-                  ? ` · ${s.detection_confidence}`
-                  : ""}{" "}
-                · abrir conversa →
-              </p>
-            </Link>
-          ))
-        )}
-      </div>
+            ) : (
+              sessions.map((s) => (
+                <Link
+                  key={s.id}
+                  to="/sessions/$sessionId"
+                  params={{ sessionId: s.id }}
+                  className="flex items-start gap-3 rounded-2xl border border-border bg-card px-3 py-3 transition-colors hover:border-primary/70"
+                >
+                  <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-xl bg-secondary">
+                    <SourceIcon source={s.source} className="border-0 bg-transparent" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-baseline gap-2">
+                      <span className="min-w-0 flex-1 truncate text-foreground">
+                        {sessionTitle(s.title, firstMessages[s.id], s.cwd)}
+                      </span>
+                      <span className="shrink-0 text-xs text-muted-foreground">
+                        {relativeTime(s.last_activity_at)}
+                      </span>
+                    </span>
+                    {/* A segunda linha guarda o que a versão em log já mostrava —
+                        estado, projeto, IDE, pid e confiança. Ela QUEBRA em vez de
+                        truncar: num viewport de 360px truncar cortaria justamente
+                        o pid e a confiança, que são a prova de vida da sessão. */}
+                    <span className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground">
+                      <span className={cn("inline-flex items-center gap-1", statusTone(s.status))}>
+                        <StatusDot status={s.status} />
+                        {s.status}
+                      </span>
+                      <span className="wrap-anywhere">
+                        · {projectName(s.cwd, s.title)}
+                        {s.ide ? ` · ${s.ide}` : " · IDE desconhecida"}
+                        {s.pid ? ` · pid ${s.pid}` : ""}
+                        {s.detection_confidence && s.detection_confidence !== "confirmed"
+                          ? ` · ${s.detection_confidence}`
+                          : ""}
+                      </span>
+                    </span>
+                  </span>
+                </Link>
+              ))
+            )}
+          </div>
+        </section>
 
-      <TermHints
-        items={[
-          "somente sessões ativas",
-          "clique numa sessão para abrir",
-          "projeto = pasta lida pelo agente",
-        ]}
-      />
-    </TermScreen>
+        <TermHints items={["somente sessões ativas", "projeto = pasta lida pelo agente"]} />
+      </div>
+    </div>
   );
 }

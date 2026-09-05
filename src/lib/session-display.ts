@@ -28,3 +28,24 @@ export function sessionTitle(
   if (msg) return msg.length > 80 ? `${msg.slice(0, 80)}…` : msg;
   return t || "Sessão sem título";
 }
+
+/**
+ * Quando foi, na forma que se lê de relance no celular.
+ *
+ * Hora cheia ("19:46:03") obriga a pessoa a comparar com o relógio para saber
+ * se a sessão é de agora ou de ontem. Perto do presente o que importa é a
+ * distância ("agora", "há 5 min"); longe, o que importa é a data — e aí a hora
+ * exata só ocupa espaço numa tela estreita.
+ */
+export function relativeTime(value?: string | null, now: Date = new Date()): string {
+  if (!value) return "—";
+  const t = new Date(value).getTime();
+  if (Number.isNaN(t)) return "—";
+  const min = Math.round((now.getTime() - t) / 60000);
+  // Relógio de máquina remota adianta: futuro perto é desvio, não viagem no tempo.
+  if (min < 1) return "agora";
+  if (min < 60) return `há ${min} min`;
+  const horas = Math.round(min / 60);
+  if (horas < 24) return `há ${horas} h`;
+  return new Date(t).toLocaleDateString("pt-BR", { day: "numeric", month: "short" });
+}

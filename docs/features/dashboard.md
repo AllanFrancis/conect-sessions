@@ -20,6 +20,7 @@
 - SPEC-20260904-2135 | 2026-09-05 | `PENDENTE` | Resposta e escolha do painel chegam na sessão de Claude Code (hook)
 - SPEC-20260904-2135 | 2026-09-05 | `PENDENTE` | Sessão é única por (user_id, external_id): duas cópias do agente não duplicam mais
 - SPEC-20260905-1833 | 2026-09-05 | `PENDENTE` | Agente honra CLAUDE_CONFIG_DIR: transcrição fora de ~/.claude deixa de ser invisível
+- SPEC-20260905-1944 | 2026-09-05 | `PENDENTE` | Sessão e lista em layout de celular: conversa com bolhas e cards arredondados
 ### Planejadas (future/)
 
 ## Estado atual
@@ -218,3 +219,24 @@ pid certos, e a **conversa vazia**. Achado rodando o teste de ponta a ponta, nao
   `~/.claude-backup` nao e `~/.claude`.
 - **Fecha a duvida da SPEC-20260904-2135:** o registro `sessions/<pid>.json` que "parecia morto na
   2.1.260" sempre existiu -- estava no outro disco. Nao era a versao do Claude Code, era o agente.
+
+### Delta de estado (SPEC-20260905-1944, 2026-09-05 19:54)
+
+As duas telas do painel passaram de log de terminal para layout de celular, a pedido do usuario e a
+partir de dois prints do app do Claude Code. Muda o ARRANJO; a paleta e a tipografia sao as mesmas.
+
+- **Primitivas novas em `terminal.tsx`**, porque a regra da regiao manda toda UI nova compor de la:
+  `TermTopBar` (barra fixa com titulo centralizado), `TermIconButton` (alvo redondo de 36px),
+  `ChatBubble` (fala do usuario a direita, `max-w` de 85%, `wrap-anywhere`), `CollapsedRow`
+  (linha com chevron que abre) e `TermComposer` (pilula fixa com area segura).
+- **Sessao**: tres faixas em `dvh` — `dvh` e nao `vh` porque no celular a barra do navegador entra e
+  sai e `vh` congela na altura errada, deixando o composer fora da tela. Agente em largura cheia,
+  usuario em bolha, ferramenta e raciocinio colapsados, pendente em bolha tracejada.
+- **Lista**: titulo grande, secao de maquinas com pilula, sessoes como cards com icone da origem,
+  hora relativa (`relativeTime()` em `session-display.ts`) e linha de estado que QUEBRA em vez de
+  truncar — em 360px o truncate comia `pid` e `confianca`, que sao a prova de vida da sessao.
+- **Auto-scroll passou a observar `replies` tambem.** Observando so `messages`, a resposta que voce
+  acabou de enviar do celular nascia atras do composer — justamente o caso de uso do produto.
+- **Nao copiado do print, de proposito**: filtro "Todos" (reverteria a SPEC-20260904-1433, decisao do
+  usuario) e FAB "Nova sessao" (o painel nao cria sessao; quem cria e a IDE). `Menu` so entrou com
+  acao real.
