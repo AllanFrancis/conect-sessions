@@ -1,16 +1,16 @@
 # SPEC-20260904-2135: resposta chega no cli
 
-**Status:** draft
+**Status:** active
 **Porte:** G
 **Owner:** @AllanFrancis
 **Criada:** 2026-09-04 21:35
-**Ativada:** —
+**Ativada:** 2026-09-04 21:39
 **Concluída:** —
 **Pausada em:** —
 **Commit final:** —
 **Keywords:** dashboard
 **Features:** dashboard
-**Branch:** —
+**Branch:** feat/resposta-chega-no-cli
 **Programa:** —
 **Workspace:** —
 **Origem:** usuário em 2026-09-04 21:35
