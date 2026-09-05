@@ -50,6 +50,7 @@ export type Database = {
           created_at: string
           external_id: string | null
           id: string
+          meta: Json | null
           role: string
           seq: number | null
           session_id: string
@@ -60,6 +61,7 @@ export type Database = {
           created_at?: string
           external_id?: string | null
           id?: string
+          meta?: Json | null
           role?: string
           seq?: number | null
           session_id: string
@@ -70,6 +72,7 @@ export type Database = {
           created_at?: string
           external_id?: string | null
           id?: string
+          meta?: Json | null
           role?: string
           seq?: number | null
           session_id?: string
@@ -128,10 +131,16 @@ export type Database = {
           agent_id: string
           created_at: string
           cwd: string | null
+          detection_confidence: string | null
+          detection_source: string | null
+          ended_at: string | null
           external_id: string
           id: string
+          ide: string | null
           last_activity_at: string
+          pid: number | null
           source: string
+          started_at: string | null
           status: string
           title: string
           user_id: string
@@ -140,10 +149,16 @@ export type Database = {
           agent_id: string
           created_at?: string
           cwd?: string | null
+          detection_confidence?: string | null
+          detection_source?: string | null
+          ended_at?: string | null
           external_id: string
           id?: string
+          ide?: string | null
           last_activity_at?: string
+          pid?: number | null
           source?: string
+          started_at?: string | null
           status?: string
           title?: string
           user_id: string
@@ -152,10 +167,16 @@ export type Database = {
           agent_id?: string
           created_at?: string
           cwd?: string | null
+          detection_confidence?: string | null
+          detection_source?: string | null
+          ended_at?: string | null
           external_id?: string
           id?: string
+          ide?: string | null
           last_activity_at?: string
+          pid?: number | null
           source?: string
+          started_at?: string | null
           status?: string
           title?: string
           user_id?: string
