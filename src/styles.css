@@ -172,3 +172,16 @@
     border-radius: 9999px;
   }
 }
+
+/*
+ * Hide the "Edit with Lovable" badge on the live website.
+ * The badge is injected as a fixed-position element with class .lovable-badge.
+ */
+.lovable-badge,
+.lovable-badge *,
+[aria-label="Edit with Lovable"],
+[aria-label="Edit with Lovable"] * {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
