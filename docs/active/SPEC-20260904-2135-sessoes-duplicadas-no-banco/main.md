@@ -88,9 +88,9 @@ sincronizam a mesma sessão.
 
 ## Critério de aceite
 
-- [ ] Medido e registrado: quantas duplicatas, sob quantos agentes, e a causa provada
-- [ ] Uma sessão de IA aparece uma única vez no painel, com a causa tratada na raiz escolhida
-- [ ] Nenhuma mensagem perdida na consolidação, conferido por contagem antes/depois
-- [ ] Payload inalterado: agente antigo continua funcionando
-- [ ] Typecheck limpo | verify: `bunx tsc --noEmit`
-- [ ] Lint limpo | verify: `bun run lint`
+- [x] Medido e registrado: quantas duplicatas, sob quantos agentes, e a causa provada (2026-09-05 16:55, commit `d7d749a`, evidence: 12 external_id duplicados sob 2 agentes do mesmo usuario, vivos ao mesmo tempo (last_seen a 15s); causa: duas copias do agente na mesma maquina, nao reinstalacao)
+- [x] Uma sessão de IA aparece uma única vez no painel, com a causa tratada na raiz escolhida (2026-09-05 16:55, commit `d7d749a`, evidence: 48->36 sessions, 0 duplicatas, com os dois agentes sincronizando ao vivo durante e depois da migracao)
+- [x] Nenhuma mensagem perdida na consolidação, conferido por contagem antes/depois (2026-09-05 16:55, commit `d7d749a`, evidence: conteudo distinto de mensagem 1824 antes e 1824 depois; a queda de 2354->1825 linhas e remocao de copia)
+- [x] Payload inalterado: agente antigo continua funcionando (2026-09-05 16:55, commit `d7d749a`, evidence: agentes nao tocados nem reiniciados, seguiram sincronizando; so o onConflict do servidor mudou)
+- [x] Typecheck limpo (2026-09-05 16:55, commit `d7d749a`, verify: exit 0) | verify: `bunx tsc --noEmit`
+- [x] Lint limpo (2026-09-05 16:55, commit `d7d749a`, verify: exit 0) | verify: `bun run lint`

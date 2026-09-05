@@ -18,6 +18,7 @@
 - SPEC-20260904-1457 | 2026-09-04 | `f4437f4` | Transcrição formatada, pergunta clicável e adaptador do Kiro
 - SPEC-20260904-2036 | 2026-09-04 | `e1de995` | Sync resiliente: entrega atômica de reply e cursor com confirmação
 - SPEC-20260904-2135 | 2026-09-05 | `PENDENTE` | Resposta e escolha do painel chegam na sessão de Claude Code (hook)
+- SPEC-20260904-2135 | 2026-09-05 | `PENDENTE` | Sessão é única por (user_id, external_id): duas cópias do agente não duplicam mais
 ### Planejadas (future/)
 
 ## Estado atual
@@ -179,3 +180,23 @@ mitigar e vira impossível por construção.
   `unknown`, sem entrega); a UI continua dizendo "enviada ao agente", nunca "respondida".
 - **Kiro está fora**: nenhuma superfície de injeção equivalente foi encontrada, e o painel não
   promete entrega lá.
+
+### Delta de estado (SPEC-20260904-2135 sessoes-duplicadas, 2026-09-05 16:55)
+
+A identidade de uma sessão de IA passou de `(agent_id, external_id)` para `(user_id, external_id)`.
+A chave antiga fazia duas cópias do agente na mesma máquina — tokens diferentes, mesmos arquivos de
+transcrição — criarem duas linhas para a MESMA sessão. Medido: 12 `external_id` duplicados, sempre
+entre agentes distintos do mesmo usuário, com as duas metades carregando conjuntos de mensagem
+idênticos.
+
+- **Por que não `external_id` puro:** o mesmo id nativo existe sob dois `user_id` (duas contas na
+  mesma máquina). Fundir seria vazar sessão de um usuário no painel do outro.
+- **Por que não identidade de máquina:** `agents` não tem campo que identifique host, e o agente não
+  manda nada disso — seria mudar o payload, que é proibido.
+- `agent_id` continua na linha e continua exibido: por onde a sessão entrou é informação. Ele só
+  deixou de participar da identidade, e quem sincroniza por último atualiza a linha existente.
+- Migração `20260905205500_sessao_unica_por_usuario.sql`: consolida **antes** de trocar a constraint
+  (criar a chave com as duplicatas vivas falharia). Sobrevivente = o mais antigo; mensagens migram
+  com `NOT EXISTS` por causa do `UNIQUE (session_id, external_id)`; `replies` migram todas.
+- Aplicada em produção com os dois agentes rodando: 48→36 sessões, 0 duplicatas, conteúdo distinto
+  de mensagem intacto (1824 antes, 1824 depois).

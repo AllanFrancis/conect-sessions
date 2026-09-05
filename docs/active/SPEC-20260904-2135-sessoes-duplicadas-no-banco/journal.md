@@ -2,7 +2,7 @@
 
 ## SNAPSHOT (sobrescrever — DEVE caber nas primeiras 60 linhas do arquivo)
 
-**Última atualização:** 2026-09-05 16:48
+**Última atualização:** 2026-09-05 16:55
 **Onde tô:** início — nada feito ainda
 **Próximo passo:** <primeiro passo concreto>
 **Última decisão:** —
@@ -127,3 +127,42 @@ ainda não existe no banco, então subir só o código quebra o `/sync`. Fica pa
 
 Typecheck e lint limpos com a mudança de código.
 ⎿ commit d6f6f4c+dirty · 2 files changed, 31 insertions(+), 4 deletions(-)
+
+## 2026-09-05 16:55 — [conclusão] Migracao aplicada em producao com os dois agentes rodando; 48->36 linhas, zero conteudo perdido
+
+Aplicada em 2026-09-05 ~16:53 com autorização do usuário ("Aplicar agora"), com os dois agentes
+duplicados **rodando ao vivo** — o que virou a melhor prova possível.
+
+**Antes → depois (contagens do banco real):**
+
+    sessions ....................... 48 → 36     (as 12 duplicatas, exatamente)
+    messages ....................... 2354 → 1825
+    conteúdo distinto de mensagem .. 1824 → 1824  ← ZERO perdido
+    duplicatas restantes ........... 12 → 0
+    constraint ..................... UNIQUE (user_id, external_id)
+
+A queda de 2354 para 1825 é remoção de cópia: o distinto por
+`(user_id, external_id da sessão, external_id da mensagem, content)` não se mexeu. Era o que a fase 1
+já tinha medido — as duas metades tinham conjuntos idênticos.
+
+**Prova ao vivo do critério 2, que não dava para forjar melhor:** `Minha maquina` e `local`
+continuaram sincronizando durante e depois da migração (`last_seen_at` a 1s da consulta). Trinta
+segundos depois: 36 sessões, **0 duplicatas**, 10 linhas atualizadas nos últimos 2 minutos, e todas
+as linhas do usuário com um `agent_id` só. Duas cópias do agente escrevendo ao mesmo tempo produzem
+uma linha por sessão — a última escrita ganha, que é o comportamento certo.
+
+**Critério 4 provado pelo mesmo fato:** os agentes não foram tocados, reiniciados nem atualizados.
+O payload não mudou; só o alvo do upsert mudou, do lado do servidor.
+
+**Susto que valeu registro:** entre aplicar a migração e a app recarregar, o `onConflict` antigo
+apontaria para uma constraint que já não existe — `/sync` responderia 500 em toda sessão. Fui
+conferir esperando encontrar estrago e encontrei `last_activity_at` de 17 segundos atrás: o dev
+server já tinha recarregado o `sync.ts` novo. Deu certo por HMR, não por planejamento. Em deploy de
+produção a ordem importa e é a inversa: **migração e código têm que subir juntos**, com a migração
+primeiro por milissegundos, não por minutos.
+⎿ commit d7d749a
+
+## 2026-09-05 16:55 — [nota] verify: 2/2 critérios passaram (commit `d7d749a`)
+
+- PASS: Typecheck limpo | verify: `bunx tsc --noEmit`
+- PASS: Lint limpo | verify: `bun run lint`
