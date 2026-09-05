@@ -2,7 +2,7 @@
 
 ## SNAPSHOT (sobrescrever — DEVE caber nas primeiras 60 linhas do arquivo)
 
-**Última atualização:** 2026-09-05 18:41
+**Última atualização:** 2026-09-05 18:42
 **Onde tô:** 5/5 critérios provados com sessão real e painel no navegador. Pronta para close.
 **Próximo passo:** fechar. Nada pendente.
 **Última decisão:** `CLAUDE_HOMES` é lista (variável + `~/.claude`), não caminho único.
@@ -88,3 +88,28 @@ do que promete: status sim, conversa não.
 
 - PASS: Typecheck limpo | verify: `bunx tsc --noEmit`
 - PASS: Lint limpo | verify: `bun run lint`
+
+## 2026-09-05 18:42 — [conclusão] Agente le de CLAUDE_CONFIG_DIR; conversa deixa de aparecer vazia no painel
+
+Entregue e provado com sessão real e o painel aberto no navegador.
+
+- `CLAUDE_HOMES` virou lista (variável + `~/.claude`, sem repetir, só o que existe em disco).
+  `projects/`, `ide/` e `sessions/` derivam dela; `DEFAULT_DIRS` recebe todas as `projects/`.
+- `pathKey()` normaliza separador e caixa antes de qualquer comparação de caminho, e `sourceOf()`
+  passou a exigir separador no fim do prefixo — `~/.claude-backup` não é `~/.claude`.
+
+**Provas:**
+
+1. classificação: arquivo em `D:/…/projects/…` era `unknown`, virou `claude-code`.
+2. `--probe` passou a listar a sessão desta própria conversa (`f4d59edd`, pid 9964) com
+   `fontes=claude:pid-registry+claude:process+claude:ide-lock+claude:transcript`.
+3. sessão real com `CLAUDE_CONFIG_DIR` isolado: 3 mensagens no banco (antes 0) e o painel renderizou
+   o ensaio inteiro, com markdown, em `/sessions/02f8baef-…`.
+4. `env -u CLAUDE_CONFIG_DIR`: volta a `~/.claude` e continua achando `d2b3ef12` — degrada para o
+   comportamento de hoje, não para menos.
+
+**Limpeza feita:** as sessões descartáveis dos testes (minhas) tinham entrado no painel do usuário
+pelos registros de hook em `~/.lrc/sessions/`. Apaguei os registros e as 16 linhas correspondentes:
+banco em 26 sessões, 0 duplicatas. Token e conta de teste removidos pelo próprio painel.
+`.playwright-mcp/` foi para o `.gitignore` — saída de teste não fica na raiz.
+⎿ commit eff3a25+dirty · 1 file changed, 18 insertions(+)

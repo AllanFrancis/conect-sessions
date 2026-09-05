@@ -19,6 +19,7 @@
 - SPEC-20260904-2036 | 2026-09-04 | `e1de995` | Sync resiliente: entrega atômica de reply e cursor com confirmação
 - SPEC-20260904-2135 | 2026-09-05 | `PENDENTE` | Resposta e escolha do painel chegam na sessão de Claude Code (hook)
 - SPEC-20260904-2135 | 2026-09-05 | `PENDENTE` | Sessão é única por (user_id, external_id): duas cópias do agente não duplicam mais
+- SPEC-20260905-1833 | 2026-09-05 | `PENDENTE` | Agente honra CLAUDE_CONFIG_DIR: transcrição fora de ~/.claude deixa de ser invisível
 ### Planejadas (future/)
 
 ## Estado atual
@@ -200,3 +201,20 @@ idênticos.
   com `NOT EXISTS` por causa do `UNIQUE (session_id, external_id)`; `replies` migram todas.
 - Aplicada em produção com os dois agentes rodando: 48→36 sessões, 0 duplicatas, conteúdo distinto
   de mensagem intacto (1824 antes, 1824 depois).
+
+### Delta de estado (SPEC-20260905-1833, 2026-09-05 18:40)
+
+O agente procurava transcricao so em `~/.claude/projects`, caminho fixo. Numa maquina que define
+`CLAUDE_CONFIG_DIR` -- quem move o perfil de disco -- TODA transcricao atual caia em
+`sourceOf() = unknown` e era pulada antes de ser lida: o painel mostrava a sessao viva, com status e
+pid certos, e a **conversa vazia**. Achado rodando o teste de ponta a ponta, nao lendo codigo.
+
+- `CLAUDE_HOMES` e LISTA: `CLAUDE_CONFIG_DIR` (aceita varios caminhos por virgula) + `~/.claude`,
+  sem repetir e so o que existe em disco. `projects/`, `ide/` e `sessions/` derivam dela.
+- Ler as duas origens e invariante, nao conveniencia: quem ja sincronizou por `~/.claude` nao pode
+  perder historico so porque a variavel passou a existir.
+- `pathKey()` normaliza separador e caixa antes de comparar. Sem isso `D:\x` nao casa com `D:/x` e o
+  bug volta com outra cara. `sourceOf()` tambem passou a exigir separador no fim do prefixo --
+  `~/.claude-backup` nao e `~/.claude`.
+- **Fecha a duvida da SPEC-20260904-2135:** o registro `sessions/<pid>.json` que "parecia morto na
+  2.1.260" sempre existiu -- estava no outro disco. Nao era a versao do Claude Code, era o agente.
