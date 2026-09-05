@@ -7,3 +7,4 @@ SPEC-20260904-1457-transcricao-formatada | done | dashboard | dashboard | A tran
 SPEC-20260904-2036-sync-resiliente | done | dashboard | dashboard | O round-trip do `/sync` para de entregar a mesma resposta várias vezes e para de perder mensagem quando o POST falha.
 SPEC-20260904-2135-resposta-chega-no-cli | done | dashboard | dashboard | A resposta enviada do celular deixa de morrer no console do agente e chega de fato à sessão de IA, inclusive desbloqueando um prompt de permissão.
 SPEC-20260904-2135-sessoes-duplicadas-no-banco | done | dashboard | dashboard | A mesma sessão de IA para de aparecer mais de uma vez no painel quando foi sincronizada por agentes diferentes.
+SPEC-20260905-1833-agente-ignora-claude-config-dir | done | dashboard | dashboard | O agente passa a ler as transcrições de onde o Claude Code de fato as escreve (`CLAUDE_CONFIG_DIR`), em vez de só em `~/.claude`.

@@ -1,13 +1,13 @@
 # SPEC-20260905-1833: agente ignora claude config dir
 
-**Status:** active
+**Status:** done
 **Porte:** P
 **Owner:** @AllanFrancis
 **Criada:** 2026-09-05 18:33
 **Ativada:** 2026-09-05 18:33
-**Concluída:** —
+**Concluída:** 2026-09-05 18:42
 **Pausada em:** —
-**Commit final:** —
+**Commit final:** `7c9d04d`
 **Keywords:** dashboard
 **Features:** dashboard
 **Branch:** fix/agente-le-claude-config-dir
