@@ -1,16 +1,16 @@
 # SPEC-20260904-2135: sessoes duplicadas no banco
 
-**Status:** draft
+**Status:** active
 **Porte:** M
 **Owner:** @AllanFrancis
 **Criada:** 2026-09-04 21:35
-**Ativada:** —
+**Ativada:** 2026-09-05 16:41
 **Concluída:** —
 **Pausada em:** —
 **Commit final:** —
 **Keywords:** dashboard
 **Features:** dashboard
-**Branch:** —
+**Branch:** feat/sessoes-duplicadas-no-banco
 **Programa:** —
 **Workspace:** —
 **Origem:** usuário em 2026-09-04 21:35
