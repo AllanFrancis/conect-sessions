@@ -1,0 +1,26 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"c:/dev/meus projetos/conect-sessions/docs/active/SPEC-20260904-2135-resposta-chega-no-cli/tmp/hooktest/stop-hook.mjs\"",
+            "timeout": 60
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"c:/dev/meus projetos/conect-sessions/docs/active/SPEC-20260904-2135-resposta-chega-no-cli/tmp/hooktest/stop-hook.mjs\"",
+            "timeout": 60
+          }
+        ]
+      }
+    ]
+  }
+}
