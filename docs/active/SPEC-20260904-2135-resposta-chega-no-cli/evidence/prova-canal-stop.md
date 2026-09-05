@@ -59,3 +59,31 @@ Agente real contra um servidor falso local, em HOME isolado:
     inbox do hook   → {"id":"r1","content":"resposta vinda do painel","at":"..."}
 
 Os três canais na mesma entrega: o novo não substituiu os antigos.
+
+## 7. Prompt de permissão destravado pela escolha do painel — critério #2
+
+Mesmo projeto descartável, agora com `PreToolUse` (matcher `Bash|Write|Edit`) no settings.
+
+**Baseline — hook desarmado** (`LRC_PERM` ausente), pedindo uma escrita que exige permissão:
+
+    result: "Preciso de permissão para criar o arquivo. O sistema está pedindo autorização
+             para escrever em `alvo.txt` no diretório atual. Você pode: 1. Aprovar..."
+    alvo.txt: NÃO existe
+
+**Armado** (`LRC_PERM=1 LRC_PERM_WAIT=60`), com a escolha do painel semeada no inbox
+(`"Sim, permitir sempre"` — o rótulo do botão, que é exatamente o que o painel manda hoje):
+
+    result: "Arquivo `alvo.txt` criado com sucesso no diretório atual com o conteúdo \"OK\"."
+    alvo.txt: existe, conteúdo OK
+    duration_ms: 8263
+
+O `PreToolUse` devolveu `permissionDecision: "allow"` e a ação passou sem modal. É o sinal de
+sucesso do contrato: a escolha feita no celular tira o terminal do prompt sem ninguém encostar
+no teclado.
+
+**Comportamento defensivo, verificado no hook direto:**
+
+    desarmado (padrão)         → sai calado em 65ms, não espera nada
+    "Always allow"             → {"hookSpecificOutput":{...,"permissionDecision":"allow",...}}
+    "segue o plano" (não é     → saída vazia E a mensagem VOLTA para o inbox, para ser entregue
+     decisão)                    pelo `Stop` como texto — não vira autorização por chute

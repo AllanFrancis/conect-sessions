@@ -1,5 +1,9 @@
 # Instalar o hook do Claude Code — passo manual
 
+> **Atualizado em 2026-09-05.** O canal foi provado em sessão real (`evidence/prova-canal-stop.md`).
+> Se você já tinha colado a versão de 04/09, **atualize o `claude-hook.mjs`**: a versão antiga
+> emitia `decision` aninhado e o Claude Code ignorava — a resposta era consumida e sumia.
+
 O classifier de permissões do Claude Code barra a escrita em `~/.claude/settings.json` mesmo com
 autorização explícita do usuário. A guarda está certa: instalar hook é permitir execução de código
 a cada turno, em todas as sessões da máquina. Então esse passo é seu.
@@ -58,6 +62,27 @@ DOIS itens (o som que já existe + o nosso), e `"SessionStart"`/`"SessionEnd"` s
   },
 ```
 
+## 1b. Opcional — destravar prompt de permissão pelo celular
+
+Some ao `PreToolUse` que você já tem. **Só ligue numa máquina de onde você sai de perto**: para
+destravar o prompt o hook precisa ESPERAR a sua escolha, e essa espera cai em quem estiver sentado ali.
+
+```jsonc
+    "PreToolUse": [
+      { /* ...o som que já existe, deixe como está... */ },
+      {
+        "matcher": "Bash|Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"c:/dev/meus projetos/conect-sessions/public/agent/claude-hook.mjs\"",
+            "timeout": 300
+          }
+        ]
+      }
+    ],
+```
+
 O caminho acima aponta para o repositório. Em outra máquina, aponte para onde o `claude-hook.mjs`
 estiver — é arquivo único, Node puro, sem dependência.
 
@@ -85,9 +110,14 @@ digitar. Se isso acontecer, o canal está provado e o critério #1 fecha.
 Se não acontecer, o hook não é o caminho e a SPEC precisa de outra fase de investigação — não
 adianta seguir construindo em cima.
 
-## 4. Para desligar sem desinstalar
+## 4. Ligar e desligar
 
-`LRC_HOOK=0` no ambiente deixa o hook inerte (sai calado, não escreve nada).
+- `LRC_HOOK=0` deixa o hook inteiro inerte (sai calado, não escreve nada).
+- `LRC_PERM=1` **arma** o canal de permissão; sem ele o `PreToolUse` sai em ~65ms e não espera nada.
+- `LRC_PERM_WAIT=120` é o teto da espera em segundos. Estourou, o modal abre como sempre abriu.
+
+O `timeout` do hook no settings precisa ser MAIOR que `LRC_PERM_WAIT`, senão o Claude Code mata a
+espera antes de a sua escolha chegar.
 
 ## 5. O que já está provado sem este passo
 

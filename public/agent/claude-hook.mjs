@@ -54,6 +54,20 @@ const STATE_DIR = process.env["LRC_STATE_DIR"] || path.join(os.homedir(), ".lrc"
 const SESSIONS_DIR = path.join(STATE_DIR, "sessions");
 const INBOX_DIR = path.join(STATE_DIR, "inbox");
 const LIGADO = process.env["LRC_HOOK"] !== "0";
+const PENDING_DIR = path.join(STATE_DIR, "pending");
+/**
+ * Canal de permissao: DESLIGADO por padrao, e de proposito.
+ *
+ * Para destravar um prompt de permissao nao basta responder depois: quando o
+ * modal abre, o turno nao acabou e o `Stop` nunca chega. Quem pode decidir e o
+ * `PreToolUse`, que roda ANTES do modal — mas so consegue usar a escolha do
+ * painel se ESPERAR por ela. Esperar e o custo, e o custo cai em quem estiver
+ * sentado na maquina. Por isso o padrao e nao esperar nada: `LRC_PERM=1` arma,
+ * e quem arma e alguem que sabe que vai sair de perto.
+ */
+const PERM_LIGADO = process.env["LRC_PERM"] === "1";
+const PERM_ESPERA_MS = Math.max(0, Number(process.env["LRC_PERM_WAIT"] || 120)) * 1000;
+const PERM_PASSO_MS = 500;
 const IS_WIN = process.platform === "win32";
 
 /** Nomes de processo que são casca, não a sessão: pulamos ao subir a árvore. */
@@ -150,7 +164,7 @@ if($achado){
  * no mesmo volume: o que estava, veio inteiro; o que chegar depois, o agente
  * grava num arquivo novo e o próximo turno leva.
  */
-function drenarInbox(sid) {
+function drenarInboxBruto(sid) {
   const inbox = arquivoDeInbox(sid);
   const tomado = `${inbox}.${process.pid}.taking`;
   try {
@@ -170,17 +184,30 @@ function drenarInbox(sid) {
       /* já foi */
     }
   }
-  const respostas = [];
+  const itens = [];
   for (const linha of linhas) {
     if (!linha.trim()) continue;
     try {
       const r = JSON.parse(linha);
-      if (typeof r?.content === "string" && r.content.trim()) respostas.push(r.content);
+      if (typeof r?.content === "string" && r.content.trim()) itens.push(r);
     } catch {
       /* linha corrompida não derruba as outras */
     }
   }
-  return respostas;
+  return itens;
+}
+
+/** Só os textos — é o que o `Stop` precisa entregar. */
+function drenarInbox(sid) {
+  return drenarInboxBruto(sid).map((r) => r.content);
+}
+
+/**
+ * Pausa sem async: o hook é síncrono do começo ao fim e trocar isso por
+ * `await` obrigaria a reescrever a entrada inteira por uma espera de 500ms.
+ */
+function esperar(ms) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 }
 
 // ---------------------------------------------------------------------------
@@ -239,6 +266,98 @@ function aoParar(input) {
   };
 }
 
+/**
+ * Le a escolha do painel como decisao de permissao.
+ *
+ * O painel manda o ROTULO do botao que o usuario tocou ("Sim, permitir",
+ * "Always allow", "Nao"), porque o mesmo canal serve para texto solto. Aqui a
+ * regra e conservadora: so vira `allow` o que for inequivocamente afirmativo, e
+ * so vira `deny` o que for inequivocamente negativo. Qualquer outra coisa NAO e
+ * decisao — e uma frase do usuario, que volta para o inbox e chega pelo `Stop`.
+ * Chutar aqui seria autorizar uma acao que ninguem autorizou.
+ */
+function decisaoDe(texto) {
+  const t = String(texto).trim().toLowerCase();
+  // A fronteira de palavra e o que separa "sim" de "simplesmente" e "nao" de "nada".
+  if (/^(sim|s|pode|permit\w*|autoriz\w*|aprov\w*|liber\w*|allow|always allow|yes|y|ok)\b/.test(t))
+    return "allow";
+  if (/^(n[aã]o|n|neg\w*|recus\w*|bloque\w*|cancel\w*|deny|don't|dont|no)\b/.test(t)) return "deny";
+  return null;
+}
+
+const arquivoPendente = (sid) => path.join(PENDING_DIR, `claude-${nomeSeguro(sid)}.json`);
+
+/** Devolve ao inbox, na frente, o que foi tirado e nao era decisao. */
+function devolverAoInbox(sid, itens) {
+  if (itens.length === 0) return;
+  try {
+    fs.mkdirSync(INBOX_DIR, { recursive: true });
+    const arq = arquivoDeInbox(sid);
+    const resto = fs.existsSync(arq) ? fs.readFileSync(arq, "utf8") : "";
+    const linhas = itens.map((i) => JSON.stringify(i)).join("\n");
+    fs.writeFileSync(arq, `${linhas}\n${resto}`);
+  } catch {
+    /* perder a ordem e ruim; perder a mensagem seria pior, mas nao ha o que fazer */
+  }
+}
+
+/**
+ * Espera a escolha do painel antes de o modal abrir.
+ *
+ * Publica o pedido em `pending/` (e o que permite ao agente e ao painel saberem
+ * que ESTA sessao esta parada esperando uma escolha, sem depender de adivinhar
+ * pela transcricao) e fica lendo o inbox ate a escolha chegar ou o prazo virar.
+ * Prazo estourado = sai calado: o modal abre como sempre abriu, e quem estiver
+ * na maquina decide. O pior caso continua sendo o comportamento de hoje.
+ */
+function aoUsarFerramenta(input) {
+  if (!PERM_LIGADO || PERM_ESPERA_MS === 0) return null;
+  // Sessao que ja nao pergunta nada nao tem prompt para destravar.
+  if (input.permission_mode === "bypassPermissions") return null;
+
+  const sid = input.session_id;
+  const pend = arquivoPendente(sid);
+  gravarJson(pend, {
+    session_id: sid,
+    tool_name: input.tool_name ?? null,
+    tool_use_id: input.tool_use_id ?? null,
+    cwd: input.cwd ?? null,
+    since: new Date().toISOString(),
+    espera_ate: new Date(Date.now() + PERM_ESPERA_MS).toISOString(),
+  });
+
+  try {
+    const limite = Date.now() + PERM_ESPERA_MS;
+    while (Date.now() < limite) {
+      const itens = drenarInboxBruto(sid);
+      if (itens.length > 0) {
+        const decisao = decisaoDe(itens[0]?.content ?? "");
+        if (decisao) {
+          devolverAoInbox(sid, itens.slice(1));
+          return {
+            hookSpecificOutput: {
+              hookEventName: "PreToolUse",
+              permissionDecision: decisao,
+              permissionDecisionReason: `Escolha do usuário no painel remoto: "${String(itens[0].content).slice(0, 200)}"`,
+            },
+          };
+        }
+        // Nao era decisao: e fala. Volta para o inbox e o Stop entrega.
+        devolverAoInbox(sid, itens);
+        return null;
+      }
+      esperar(PERM_PASSO_MS);
+    }
+    return null;
+  } finally {
+    try {
+      fs.unlinkSync(pend);
+    } catch {
+      /* ja foi */
+    }
+  }
+}
+
 function aoEncerrar(input) {
   const file = arquivoDeRegistro(input.session_id);
   const registro = lerJson(file);
@@ -264,6 +383,9 @@ function main(raw) {
       break;
     case "Stop":
       saida = aoParar(input);
+      break;
+    case "PreToolUse":
+      saida = aoUsarFerramenta(input);
       break;
     case "SessionEnd":
       aoEncerrar(input);

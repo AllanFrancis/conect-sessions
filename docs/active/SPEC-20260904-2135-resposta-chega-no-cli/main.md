@@ -53,7 +53,15 @@ resultado derrubou a hipótese que este parágrafo trazia. Registro do que caiu 
 - **Caminho escolhido: hooks do Claude Code.** O hook roda DENTRO da sessão e recebe o `session_id` dela.
   - `Stop` → `{"hookSpecificOutput":{"hookEventName":"Stop","decision":"block","reason":"<fala do usuário>"}}`: a sessão não para e recebe o texto como instrução. É a entrega.
   - `SessionStart`/`SessionEnd` → registram sessão, PID e start-time em `~/.lrc/sessions/`, que é o que devolve a detecção de Claude ao monitor.
-  - `PreToolUse` → aceita `permissionDecision: allow|deny`; é por onde o prompt de permissão pode ser destravado. **Fase 3, ainda não desenhada.**
+  - `PreToolUse` → aceita `permissionDecision: allow|deny`; é por onde o prompt de permissão é
+    destravado. **Fase 3 fechada em 2026-09-05, provada em sessão real.** Desenho: o hook publica o
+    pedido em `~/.lrc/pending/` e ESPERA a escolha chegar ao inbox, porque quando o modal abre o turno
+    não terminou e o `Stop` nunca chega — responder depois não destrava nada. Esperar custa a quem
+    está sentado na máquina, então o canal nasce DESLIGADO: `LRC_PERM=1` arma e `LRC_PERM_WAIT`
+    (padrão 120s) limita a espera. Prazo estourado = sai calado e o modal abre como sempre.
+  - Correção medida na fase 2: em `Stop`, `decision`/`reason` são TOP-LEVEL. Aninhados em
+    `hookSpecificOutput` (a forma do `PreToolUse`) o inbox é drenado e a decisão ignorada — a fala do
+    usuário some depois de o painel dizer que entregou.
 - Transporte agente↔hook por arquivo (`~/.lrc/inbox/claude-<sessionId>.jsonl`), não por porta. O agente escreve com append, o hook drena com `rename` atômico. `LRC_REPLY_FILE`/`LRC_REPLY_CMD` continuam sendo chamados como sempre.
 - Efeito colateral bom: o invariante "nunca digitar na sessão errada" deixa de ser risco a mitigar. O hook só existe dentro da sessão de destino.
 - Restrição de instalação, medida: hook passado por `--settings <arquivo>` NÃO é carregado. Só vale `settings.json` em disco — logo, instalar o hook é passo manual do usuário (`evidence/instalar-hook.md`).
@@ -80,11 +88,11 @@ resultado derrubou a hipótese que este parágrafo trazia. Registro do que caiu 
 
 ## Critério de aceite
 
-- [ ] Resposta enviada do painel aparece na sessão de IA de origem, provada com a sessão real rodando (não simulada)
-- [ ] Prompt de permissão aberto é desbloqueado pela escolha feita no painel — OU está escrito no contrato que este caso ficou fora, e a UI não o promete
-- [ ] Resposta para a sessão A nunca é digitada na sessão B, nem em outra máquina do mesmo usuário
-- [ ] `LRC_REPLY_FILE` e `LRC_REPLY_CMD` continuam funcionando como hoje
-- [ ] **[somado 2026-09-04 22:00]** `--probe` volta a enxergar sessões de Claude Code vivas, com `confiança=confirmed` e prova de vida por PID + start-time (hoje enxerga zero)
-- [ ] **[somado 2026-09-04 22:00]** Sessão de Claude Code SEM o hook instalado continua aparecendo como hoje (`unknown`/`transcript-only`) e não recebe entrega — degradar não pode virar mentira
-- [ ] Typecheck limpo | verify: `bunx tsc --noEmit`
-- [ ] Lint limpo | verify: `bun run lint`
+- [x] Resposta enviada do painel aparece na sessão de IA de origem, provada com a sessão real rodando (não simulada) (2026-09-05 16:28, commit `5c7cbef`, evidence: sessao real com --session-id, inbox semeado: num_turns 2, result ABACAXI (evidence/prova-canal-stop.md secao 2))
+- [x] Prompt de permissão aberto é desbloqueado pela escolha feita no painel — OU está escrito no contrato que este caso ficou fora, e a UI não o promete (2026-09-05 16:40, commit `5c7cbef`, evidence: desarmado: negado, alvo.txt nao criado; armado com 'Sim, permitir sempre' no inbox: PreToolUse devolveu allow e o arquivo foi criado (evidence/prova-canal-stop.md secao 7))
+- [x] Resposta para a sessão A nunca é digitada na sessão B, nem em outra máquina do mesmo usuário (2026-09-05 16:28, commit `5c7cbef`, evidence: inbox de A semeado, sessao B rodada: B respondeu o dela e o inbox de A ficou intacto (evidence/prova-canal-stop.md secao 3))
+- [x] `LRC_REPLY_FILE` e `LRC_REPLY_CMD` continuam funcionando como hoje (2026-09-05 16:28, commit `5c7cbef`, evidence: agente real + servidor falso em HOME isolado: REPLY_FILE, REPLY_CMD e inbox do hook receberam a mesma resposta (evidence/prova-canal-stop.md secao 6))
+- [x] **[somado 2026-09-04 22:00]** `--probe` volta a enxergar sessões de Claude Code vivas, com `confiança=confirmed` e prova de vida por PID + start-time (hoje enxerga zero) (2026-09-05 16:28, commit `5c7cbef`, evidence: probe durante o turno: [ACTIVE] claude-code pid=34836 confianca=confirmed fontes=claude:hook+claude:process+claude:transcript (evidence/prova-canal-stop.md secao 4))
+- [x] **[somado 2026-09-04 22:00]** Sessão de Claude Code SEM o hook instalado continua aparecendo como hoje (`unknown`/`transcript-only`) e não recebe entrega — degradar não pode virar mentira (2026-09-05 16:28, commit `5c7cbef`, evidence: projeto sem hook, inbox semeado: nada entregue, inbox intacto, nenhum registro criado (evidence/prova-canal-stop.md secao 5))
+- [x] Typecheck limpo (2026-09-05 16:40, commit `5c7cbef`, verify: exit 0) | verify: `bunx tsc --noEmit`
+- [x] Lint limpo (2026-09-05 16:40, commit `5c7cbef`, verify: exit 0) | verify: `bun run lint`
