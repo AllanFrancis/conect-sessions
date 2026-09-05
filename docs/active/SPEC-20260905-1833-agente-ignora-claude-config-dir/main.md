@@ -86,8 +86,8 @@ ser explícita, senão `D:\VSCode...` não casa com `D:/VSCode...` e o bug volta
 
 ## Critério de aceite
 
-- [ ] `--probe`/agente reconhecem transcrição sob `CLAUDE_CONFIG_DIR` (hoje: `source=unknown`, arquivo pulado)
-- [ ] Mensagens de uma sessão de Claude Code viva chegam ao painel nesta máquina, provado com sessão real
-- [ ] Máquina SEM `CLAUDE_CONFIG_DIR` continua lendo `~/.claude` como hoje
-- [ ] Typecheck limpo | verify: `bunx tsc --noEmit`
-- [ ] Lint limpo | verify: `bun run lint`
+- [x] `--probe`/agente reconhecem transcrição sob `CLAUDE_CONFIG_DIR` (hoje: `source=unknown`, arquivo pulado) (2026-09-05 18:40, commit `9c8917c`, evidence: arquivo em D:/.../projects: sourceOf ANTES=unknown, DEPOIS=claude-code; --probe passou a listar a sessao desta conversa (f4d59edd, pid 9964) com claude:transcript)
+- [x] Mensagens de uma sessão de Claude Code viva chegam ao painel nesta máquina, provado com sessão real (2026-09-05 18:40, commit `9c8917c`, evidence: sessao real com CLAUDE_CONFIG_DIR isolado: 3 mensagens no banco (antes 0) e o painel renderizou o ensaio inteiro em http://localhost:8080/sessions/02f8baef)
+- [x] Máquina SEM `CLAUDE_CONFIG_DIR` continua lendo `~/.claude` como hoje (2026-09-05 18:40, commit `9c8917c`, evidence: env -u CLAUDE_CONFIG_DIR: probe segue achando d2b3ef12 em ~/.claude com pid-registry+transcript)
+- [x] Typecheck limpo (2026-09-05 18:40, commit `9c8917c`, verify: exit 0) | verify: `bunx tsc --noEmit`
+- [x] Lint limpo (2026-09-05 18:40, commit `9c8917c`, verify: exit 0) | verify: `bun run lint`
