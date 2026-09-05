@@ -161,24 +161,49 @@ export const Route = createFileRoute("/api/public/agent/sync")({
           }
         }
 
-        const { data: replies } = await supabaseAdmin
+        // Entregar e marcar no MESMO comando (`UPDATE ... RETURNING`).
+        //
+        // Antes eram dois: ler os pendentes, depois marcá-los. Dois syncs da
+        // mesma sessão em voo — o que acontece o tempo todo, porque o tick do
+        // agente não espera o anterior — liam a mesma linha antes de qualquer
+        // escrita e levavam a mesma resposta. Reproduzido contra o deploy: 3
+        // requisições paralelas receberam o mesmo reply, e como o agente roda o
+        // `LRC_REPLY_CMD` para cada uma, o comando do usuário rodaria 3x.
+        //
+        // Com um comando só, o segundo UPDATE concorrente espera o primeiro
+        // comitar, reavalia o `WHERE`, não encontra mais nada `pending` e leva
+        // zero linhas. Uma requisição leva a resposta; as outras, nada.
+        // O sync de UMA sessão drena as respostas de TODAS as sessões deste
+        // agente, não só as dela.
+        //
+        // O agente só faz POST para sessão que o monitor enxerga agora ou que
+        // teve mensagem nova. Uma sessão que já terminou não se encaixa em
+        // nenhum dos dois: a resposta que o usuário mandasse para ela ficava
+        // `pending` para sempre, sem nada na tela dizendo isso. Medido — de 11
+        // respostas num passe de 11 min, 6 nunca chegaram, e eram exatamente as
+        // 6 sessões que o monitor não via.
+        //
+        // Escopo por AGENTE e não por usuário, de propósito: o mesmo usuário tem
+        // várias máquinas, e a resposta escrita para a sessão de uma não pode
+        // ser entregue no terminal da outra.
+        const { data: minhasSessoes } = await supabaseAdmin
+          .from("sessions")
+          .select("id")
+          .eq("agent_id", agent.id);
+        const idsDoAgente = (minhasSessoes ?? []).map((s) => s.id);
+
+        const { data: entregues } = await supabaseAdmin
           .from("replies")
-          .select("id, content, created_at")
-          .eq("session_id", session.id)
+          .update({ status: "delivered", delivered_at: new Date().toISOString() })
+          .in("session_id", idsDoAgente.length ? idsDoAgente : [session.id])
           .eq("status", "pending")
-          .order("created_at", { ascending: true });
+          .select("id, content, created_at, session_id");
 
-        if (replies && replies.length > 0) {
-          await supabaseAdmin
-            .from("replies")
-            .update({ status: "delivered", delivered_at: new Date().toISOString() })
-            .in(
-              "id",
-              replies.map((r) => r.id),
-            );
-        }
+        // O UPDATE não aceita `order`, e a ordem importa: são falas do usuário,
+        // que chegam ao terminal na sequência em que ele as escreveu.
+        const replies = (entregues ?? []).sort((a, b) => a.created_at.localeCompare(b.created_at));
 
-        return json({ session_id: session.id, replies: replies ?? [] });
+        return json({ session_id: session.id, replies });
       },
     },
   },

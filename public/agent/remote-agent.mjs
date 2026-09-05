@@ -28,6 +28,7 @@
  *   LRC_REPLY_FILE=/caminho/inbox.txt    além disso, grava cada resposta neste arquivo
  *   LRC_PROC_TTL=4000                    cache do snapshot de processos em ms
  *   LRC_MONITOR=0                        desliga a camada de session monitoring
+ *   LRC_CONCURRENCY=4                    syncs de estado simultâneos por tick
  */
 
 import fs from "node:fs";
@@ -46,6 +47,7 @@ const REPLY_CMD = process.env.LRC_REPLY_CMD || "";
 const REPLY_FILE = process.env.LRC_REPLY_FILE || "";
 const PROC_TTL = Number(process.env.LRC_PROC_TTL || 4000);
 const MONITOR_ON = process.env.LRC_MONITOR !== "0";
+const SYNC_CONCURRENCY = Math.max(1, Number(process.env.LRC_CONCURRENCY || 4));
 
 if (!PROBE && (!URL_BASE || !TOKEN)) {
   console.error("Defina LRC_URL e LRC_TOKEN (ou rode com --probe para só diagnosticar).");
@@ -1086,6 +1088,18 @@ function normalize(obj, ctx) {
   };
 }
 
+/**
+ * Le o que ainda nao foi enviado de um arquivo.
+ *
+ * NAO move o cursor: devolve `nextOffset` e deixa quem chamou gravar, DEPOIS de
+ * o servidor confirmar. Antes esta funcao adiantava `sent` e o `tick()` so
+ * entao fazia o POST — qualquer falha de rede descartava aquelas mensagens para
+ * sempre naquela execucao. Foi assim que uma tempestade de 500 apagou uma tarde
+ * inteira de transcricao: todo tick avancava o cursor sem nada ser gravado.
+ *
+ * Reenviar e barato: o upsert de mensagens usa `ignoreDuplicates` sobre
+ * `(session_id, external_id)`, entao repetir um lote nao duplica nada.
+ */
 function readNew(file) {
   const raw = fs.readFileSync(file, "utf8");
   if (/\.(json|chat)$/i.test(file)) {
@@ -1093,7 +1107,7 @@ function readNew(file) {
     try {
       parsed = JSON.parse(raw);
     } catch {
-      return { messages: [] };
+      return { messages: [], nextOffset: sent.get(file) ?? 0 };
     }
     const candidates = Array.isArray(parsed)
       ? parsed
@@ -1111,8 +1125,7 @@ function readNew(file) {
         return message ? { ...message, seq: start + i } : null;
       })
       .filter(Boolean);
-    sent.set(file, items.length);
-    return { messages };
+    return { messages, nextOffset: items.length };
   }
 
   const lines = raw.split("\n").filter((l) => l.trim());
@@ -1121,8 +1134,11 @@ function readNew(file) {
   // O indice cobre o arquivo INTEIRO, nao so as linhas novas: a chamada pode ter
   // sido lida num tick anterior e o resultado chegar so agora.
   const ctx = sourceOf(file) === "kiro" ? { toolCalls: kiroToolCalls(lines) } : undefined;
-  sent.set(file, lines.length);
   const messages = [];
+  // Uma linha meio escrita nao pode ser dada como lida: o cursor para NELA, e a
+  // proxima passagem a le inteira. Por isso o offset e o minimo entre o fim do
+  // arquivo e a primeira linha que nao deu para parsear.
+  let nextOffset = lines.length;
   fresh.forEach((line, i) => {
     try {
       const parsed = JSON.parse(line);
@@ -1132,38 +1148,114 @@ function readNew(file) {
         if (m) messages.push({ ...m, seq: start + i });
       }
     } catch {
-      /* linha parcial: será relida na próxima passagem */
-      sent.set(file, start + i);
+      nextOffset = Math.min(nextOffset, start + i);
     }
   });
-  return { messages };
+  return { messages, nextOffset };
 }
 
 // ---------------------------------------------------------------------------
 // envio
 // ---------------------------------------------------------------------------
 
-async function postSync(session, messages) {
-  const res = await fetch(`${URL_BASE}/api/public/agent/sync`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ token: TOKEN, session, messages }),
-  });
-  if (!res.ok) {
-    console.error("sync falhou:", res.status, await res.text());
-    return null;
-  }
-  return res.json();
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Roda `fn` sobre `itens` com no maximo `limite` em voo ao mesmo tempo.
+ *
+ * Trabalhadores que puxam de uma fila compartilhada, em vez de fatiar em blocos:
+ * uma sessao lenta nao segura as outras esperando o bloco inteiro terminar.
+ */
+async function emLotes(itens, limite, fn) {
+  let proximo = 0;
+  const trabalhador = async () => {
+    while (proximo < itens.length) {
+      const item = itens[proximo++];
+      await fn(item);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limite, itens.length) }, trabalhador));
 }
 
+/** Espera entre as tentativas de um mesmo POST. Duas retentativas, curtas. */
+const BACKOFF_MS = [500, 1500];
+
+/**
+ * Por que o `fetch` falhou, em uma linha.
+ *
+ * O `err.message` do undici e sempre "fetch failed" — que nao diz nada. O que
+ * diz e o `cause` (ECONNRESET, UND_ERR_SOCKET, ETIMEDOUT...). Descartar esse
+ * campo transformava toda falha de rede num log inutil.
+ */
+function motivoDaFalha(err) {
+  const causa = err?.cause?.code ?? err?.cause?.message;
+  return causa ? `${err.message} (${causa})` : String(err?.message ?? err);
+}
+
+/**
+ * Envia um lote e devolve a resposta do servidor, ou `null` se desistiu.
+ *
+ * Retenta falha de transporte e 5xx: a rede pisca e o servidor reinicia. NAO
+ * retenta 4xx — 400 e payload errado e 401 e token errado; nenhum dos dois se
+ * conserta esperando. `null` e o sinal de que o lote NAO foi gravado, e e o que
+ * segura o cursor do arquivo no lugar em `tick()`.
+ */
+async function postSync(session, messages) {
+  for (let tentativa = 0; ; tentativa++) {
+    const ultima = tentativa >= BACKOFF_MS.length;
+    try {
+      const res = await fetch(`${URL_BASE}/api/public/agent/sync`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ token: TOKEN, session, messages }),
+      });
+      if (res.ok) return res.json();
+
+      const corpo = await res.text();
+      if (res.status < 500) {
+        console.error("sync recusado:", res.status, corpo);
+        return null;
+      }
+      if (ultima) {
+        console.error("sync falhou:", res.status, corpo);
+        return null;
+      }
+      console.error(`sync falhou: ${res.status} — nova tentativa em ${BACKOFF_MS[tentativa]}ms`);
+    } catch (err) {
+      if (ultima) {
+        console.error("sync falhou:", motivoDaFalha(err));
+        return null;
+      }
+      console.error(
+        `sync falhou: ${motivoDaFalha(err)} — nova tentativa em ${BACKOFF_MS[tentativa]}ms`,
+      );
+    }
+    await sleep(BACKOFF_MS[tentativa]);
+  }
+}
+
+/**
+ * Entrega as respostas que vieram no round-trip.
+ *
+ * O servidor devolve as respostas de TODAS as sessoes deste agente, nao so as da
+ * sessao que acabou de sincronizar — e o que faz resposta para sessao ja
+ * encerrada chegar em vez de morrer pendente. Por isso o rotulo e o
+ * `{{session}}` seguem a sessao DA RESPOSTA, nao a do POST: anunciar tudo com o
+ * nome da sessao sincronizada seria mentir sobre a origem.
+ *
+ * O `?? data.session_id` cobre servidor antigo, que ainda nao manda
+ * `session_id` por resposta.
+ */
 function deliverReplies(data, label) {
   for (const reply of data?.replies ?? []) {
-    console.log(`\n>> resposta remota para ${label}:\n${reply.content}\n`);
+    const daSessaoSincronizada = !reply.session_id || reply.session_id === data.session_id;
+    const origem = daSessaoSincronizada ? label : `outra sessão (${reply.session_id})`;
+    console.log(`\n>> resposta remota para ${origem}:\n${reply.content}\n`);
     if (REPLY_FILE) fs.appendFileSync(REPLY_FILE, `${reply.content}\n`);
     if (REPLY_CMD) {
       const cmd = REPLY_CMD.replaceAll("{{reply}}", reply.content.replace(/"/g, '\\"')).replaceAll(
         "{{session}}",
-        data.session_id,
+        reply.session_id ?? data.session_id,
       );
       exec(cmd, (err) => err && console.error("comando de resposta falhou:", err.message));
     }
@@ -1215,8 +1307,13 @@ async function tick() {
     const key = `${native.agent}:${native.id}`;
 
     try {
-      const { messages } = readNew(file);
-      if (messages.length === 0) continue;
+      const { messages, nextOffset } = readNew(file);
+      if (messages.length === 0) {
+        // Nada novo para enviar, mas o cursor ainda pode ter que andar: linhas
+        // que o normalize descarta (infraestrutura da IDE) contam como lidas.
+        sent.set(file, nextOffset);
+        continue;
+      }
       handled.add(key);
 
       const monitor = byId.get(key);
@@ -1239,26 +1336,39 @@ async function tick() {
             detection_confidence: "unknown",
           };
 
-      for (let i = 0; i < messages.length; i += 200) {
+      // O cursor só anda depois que TODOS os lotes foram gravados. Um lote que
+      // falha interrompe aqui e deixa o offset onde estava: o tick seguinte
+      // reenvia o mesmo trecho, e o `ignoreDuplicates` do upsert absorve o que
+      // por acaso já tiver entrado.
+      let gravado = true;
+      for (let i = 0; i < messages.length && gravado; i += 200) {
         const data = await postSync(session, messages.slice(i, i + 200));
-        if (i === 0) deliverReplies(data, path.basename(file));
+        if (!data) gravado = false;
+        else if (i === 0) deliverReplies(data, path.basename(file));
       }
+      if (gravado) sent.set(file, nextOffset);
     } catch (err) {
-      console.error("erro em", file, err.message);
+      console.error("erro em", file, motivoDaFalha(err));
     }
   }
 
   // 2) estado das sessões monitoradas que não tiveram mensagem nova neste tick
-  for (const [key, m] of byId) {
-    if (handled.has(key)) continue;
-    if (m.status === "unknown" && !m.last_activity_at) continue; // nada a dizer
+  //
+  // Em paralelo, com limite. Uma de cada vez seria seguro mas lento: com ~800ms
+  // de ida e volta e uma dúzia de sessões, o ciclo passaria de 7s e o status na
+  // tela ficaria velho. O limite existe para não voltar ao empilhamento que
+  // causava dezenas de requisições em voo contra a mesma origem.
+  const pendentes = [...byId].filter(
+    ([key, m]) => !handled.has(key) && !(m.status === "unknown" && !m.last_activity_at),
+  );
+  await emLotes(pendentes, SYNC_CONCURRENCY, async ([key, m]) => {
     try {
       const data = await postSync(sessionPayload(m), []);
       deliverReplies(data, m.title || m.session_id);
     } catch (err) {
-      console.error("erro ao sincronizar", key, err.message);
+      console.error("erro ao sincronizar", key, motivoDaFalha(err));
     }
-  }
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -1325,8 +1435,27 @@ if (PROBE) {
   DIRS.forEach((d) => console.log("  -", d));
   console.log(`Enviando para ${URL_BASE} a cada ${INTERVAL}ms…`);
 
-  await tick();
-  setInterval(() => {
-    tick().catch((e) => console.error(e.message));
-  }, INTERVAL);
+  // Laço auto-agendado, não `setInterval`: o timer disparava sem olhar se o
+  // tick anterior tinha terminado. Com ~800ms de ida e volta e uma dúzia de
+  // sessões, um tick passa de 7s e ficavam quatro em voo, sobrepostos — o que
+  // fazia dois syncs da mesma sessão levarem a mesma resposta. Aqui o INTERVAL
+  // é descanso ENTRE ticks, que é o que ele sempre quis dizer.
+  for (;;) {
+    const comeco = Date.now();
+    try {
+      await tick();
+    } catch (e) {
+      console.error(motivoDaFalha(e));
+    }
+    // Dorme o QUE SOBRA do intervalo, não o intervalo inteiro: `LRC_INTERVAL` é
+    // período de polling, não pausa entre ticks. Dormir 2s cheios depois de um
+    // tick de 3s daria um ciclo de 5s — o painel ficaria mais velho do que o
+    // usuário pediu.
+    //
+    // O piso existe para o caso ruim: se o servidor degradar e cada tick passar
+    // do intervalo, sem ele o agente emendaria um tick no outro para sempre,
+    // martelando justo quem já está sofrendo.
+    const restante = INTERVAL - (Date.now() - comeco);
+    await sleep(Math.max(INTERVAL * 0.25, restante));
+  }
 }
