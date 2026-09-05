@@ -2,60 +2,59 @@
 
 ## SNAPSHOT (sobrescrever — DEVE caber nas primeiras 60 linhas do arquivo)
 
-**Última atualização:** 2026-09-05 16:40
-**Onde tô:** fases 1 e 2 entregues. Código pronto, typecheck e lint limpos. Falta UMA prova.
-**Próximo passo:** usuário cola `evidence/instalar-hook.md` no settings.json e roda o teste do
-ABACAXI. Sessão continuou sozinha → critério #1 fecha. Não continuou → o canal caiu, fase 1 reabre.
-**Última decisão:** canal = hook `Stop`; detecção de Claude também pelo hook; `external_id` no /sync.
-**Bloqueio atual:** só o passo manual de instalar o hook (classifier barra a escrita no settings.json).
-**Se retomar, ler:** main.md e os LOGs 21:54 → 22:14 na ordem ([nota] 22:14 corrige [descoberta] 21:54).
+**Última atualização:** 2026-09-05 16:45
+**Onde tô:** 8/8 critérios provados com sessão real. Fases 1, 2 e 3 fechadas. Pronta para close.
+**Próximo passo:** fechar a SPEC e abrir a SPEC-20260904-2135-sessoes-duplicadas-no-banco.
+**Última decisão:** permissão fecha por ENTREGA (PreToolUse esperando), não por exclusão.
+**Bloqueio atual:** nenhum para a SPEC. Fora dela: instalar o hook no `~/.claude/settings.json` do
+usuário continua sendo passo manual (o classifier barra a escrita — tentado de novo em 05/09).
+**Se retomar, ler:** `evidence/prova-canal-stop.md` (as 7 provas) e os LOGs de 05/09.
 
 ### Fases
 
-| #   | Descrição                                  | Status                   | Atualizado       |
-| --- | ------------------------------------------ | ------------------------ | ---------------- |
-| 1   | Investigação: caminho viável por IDE       | concluída                | 2026-09-04 21:55 |
-| 2   | Hook + inbox + roteamento + detecção       | código pronto, sem prova | 2026-09-04 22:25 |
-| 3   | Prompt de permissão (PreToolUse) — ou fora | pendente (após fase 2)   | 2026-09-04 22:25 |
+| #   | Descrição                            | Status                        | Atualizado       |
+| --- | ------------------------------------ | ----------------------------- | ---------------- |
+| 1   | Investigação: caminho viável por IDE | concluída                     | 2026-09-04 21:55 |
+| 2   | Hook + inbox + roteamento + detecção | concluída, provada em sessão  | 2026-09-05 16:28 |
+| 3   | Prompt de permissão (PreToolUse)     | concluída, provada em sessão  | 2026-09-05 16:45 |
 
 ### Fatos confirmados / Inferências prováveis / Dúvidas em aberto
 
-- fato: sessões Claude do usuário = `claude.exe` da extensão, stream-json por pipe, SEM console →
-  SendKeys/WriteConsoleInput não têm alvo. Automação de janela descartada, não adiada.
-- fato: com 4 `claude.exe` vivos, `--probe` achava 0 sessões de Claude. A 2.1.260 não escreve o
-  registro que a 2.1.259 escrevia — NÃO provado que o formato saiu do produto (ver [nota] 22:14).
-- fato: doc oficial confirma `Stop`→`decision:block`+`reason` e `PreToolUse`→`permissionDecision`;
-  e hook via `--settings <arquivo>` NÃO carrega (2 execuções reais). Só settings.json de disco.
-- fato: o hook drena o inbox e emite o `decision:block` correto; a resolução de PID achou
-  `claude.exe` 28884 com `proc_start` batendo; com esse registro o agente lista a sessão com
-  `confiança=confirmed` (antes: zero).
-- inferência: Kiro não tem superfície de injeção equivalente (procurei, não achei; não é prova).
-  Entrou como FORA no main.md, e a UI não promete entrega lá.
-- dúvida: o Claude Code honra `decision:"block"`? É o único elo não provado. E na fase 3, como armar
-  o `PreToolUse` sem travar quem está na máquina — o risco do token segue sem mitigação.
+- fato: `decision`/`reason` são TOP-LEVEL no `Stop`. Aninhados, o hook drena o inbox e o Claude Code
+  ignora — a fala do usuário some depois de o painel dizer que entregou. Medido em execução real.
+- fato: sessões Claude do usuário são `claude.exe` por pipe, sem console → teclado não tem alvo.
+- fato: hook por `--settings <arquivo>` NÃO carrega; só `settings.json` de disco (de projeto serve).
+- fato: `settings.json` com JSON inválido faz o Claude Code ignorar TODOS os hooks EM SILÊNCIO.
+- fato: para destravar o modal é preciso ESPERAR no `PreToolUse` — depois que ele abre não há evento.
+- inferência: Kiro não tem superfície equivalente. Entrou como FORA; a UI não promete entrega lá.
+- dúvida: o `--probe` de 05/09 mostrou uma sessão com `claude:pid-registry`, camada que em 04/09
+  parecia morta. Não isolei a condição. Não muda decisão — a fonte do hook não depende de versão.
 
 ### Respostas-chave do usuário
 
-- 21:39 "Abrir a 1. Seja autonomo e corrija" · 22:00 autorizou instalar o hook no settings.json,
-  "Somar external_id ao reply" e "Consertar dentro desta SPEC" (detecção entra no escopo)
+- 21:39 "Abrir a 1. Seja autonomo e corrija" · 22:00 autorizou instalar o hook, "Somar external_id ao
+  reply" e "Consertar dentro desta SPEC" · 05/09 16:26 "seja automono" e "ao concluir essa SPEC, ja
+  inicie a proxima spec SPEC-20260904-2135-sessoes-duplicadas-no-banco"
 
 ### Tentativas que falharam
 
-- hook por `--settings` (com e sem `--setting-sources`): nenhum hook rodou.
-- escrever settings.json (projeto e global), redirecionar stderr, ler `session-env/` (vazio):
-  barrados pelo classifier, não contornados. E o detector rotulava `ide=CLI` sem prova → `null`.
+- escrever `~/.claude/settings.json` e `.claude/settings.local.json`: barrados pelo classifier nas
+  duas datas. Não contornei — a prova saiu num projeto descartável com settings PRÓPRIO.
+- baseline de permissão com `echo`: não pede permissão nesta config, teria "passado" sem provar nada.
 
 ### Arquivos tocados
 
-- `claude-hook.mjs` (novo) · `remote-agent.mjs` · `sync.ts` · `docs/session-monitoring.md` · main.md
+- `claude-hook.mjs` · `remote-agent.mjs` · `sync.ts` · `docs/session-monitoring.md` ·
+  `docs/features/dashboard.md` · main.md · `evidence/prova-canal-stop.md` · `evidence/instalar-hook.md`
 
 ### Onde parei
 
-Código das fases 1 e 2 pronto, gates limpos. Falta o usuário instalar o hook e rodar o ABACAXI.
+Tudo provado e commitado. Falta só o close.
 
 ### Sessões (máx 5 linhas + 1 agregada)
 
 - 2026-09-04 21:39–22:25 — ativação, fase 1 (investigação) e fase 2 (hook + inbox + detecção).
+- 2026-09-05 15:21–16:45 — prova do canal, correção do `decision` top-level, fase 3 e fechamento.
 
 ## LOG (append-only — NUNCA editar entradas antigas)
 <!-- tipos: ativação descoberta decisão tentativa blocker unblock refactor nota conclusão | entrada nova: specctl log -->

@@ -17,6 +17,7 @@
 - SPEC-20260904-1433 | 2026-09-04 | `fc53ff4` | Painel lista apenas sessões ativas
 - SPEC-20260904-1457 | 2026-09-04 | `f4437f4` | Transcrição formatada, pergunta clicável e adaptador do Kiro
 - SPEC-20260904-2036 | 2026-09-04 | `e1de995` | Sync resiliente: entrega atômica de reply e cursor com confirmação
+- SPEC-20260904-2135 | 2026-09-05 | `PENDENTE` | Resposta e escolha do painel chegam na sessão de Claude Code (hook)
 ### Planejadas (future/)
 
 ## Estado atual
@@ -150,3 +151,31 @@ O round-trip ganhou as três garantias que faltavam para ele ser confiável sob 
   payload byte a byte idêntico, visto até 6x. Entre lotes o `ON CONFLICT DO NOTHING` resolve;
   DENTRO do lote iam duas linhas iguais no mesmo INSERT, então `sync.ts` deduplica por
   `external_id` antes de gravar.
+
+### Delta de estado (SPEC-20260904-2135, 2026-09-05 16:45)
+
+A resposta parou de morrer no console do agente. Quem entrega é um **hook do Claude Code**
+(`public/agent/claude-hook.mjs`), porque a sessão que o usuário roda é `claude.exe` falando
+stream-json por pipe: não há console, não há janela, não há teclado para simular. O hook roda DENTRO
+da sessão de destino e recebe o `session_id` dela — "escrever na sessão errada" deixa de ser risco a
+mitigar e vira impossível por construção.
+
+- **Texto** → hook `Stop`. Drena `~/.lrc/inbox/claude-<sid>.jsonl` (o agente escreve com append, o
+  hook toma com `rename` atômico) e devolve `decision: "block"` + `reason`. A sessão não para e
+  recebe a fala como instrução. **`decision`/`reason` são TOP-LEVEL**: aninhados em
+  `hookSpecificOutput` o inbox é drenado e a decisão ignorada — a fala some depois de o painel dizer
+  que entregou. Medido, não deduzido.
+- **Permissão** → hook `PreToolUse`, que ESPERA a escolha chegar. Responder depois não destrava: com
+  o modal aberto o turno não terminou e o `Stop` nunca chega. A espera cai em quem estiver na
+  máquina, então o canal nasce desligado (`LRC_PERM=1` arma, `LRC_PERM_WAIT` limita, prazo estourado
+  abre o modal como sempre). Não precisou de protocolo novo: o painel já manda o rótulo do botão como
+  reply comum, e o hook classifica — só o inequivocamente afirmativo vira `allow`, o resto volta ao
+  inbox e chega como texto.
+- **Detecção** → `SessionStart`/`SessionEnd` gravam `~/.lrc/sessions/claude-<sid>.json` com pid e
+  start-time. É o que devolveu Claude Code ao `--probe` com `confiança=confirmed`, sem depender de
+  qual versão da IDE está instalada.
+- **Instalar o hook é passo manual do usuário** — `--settings <arquivo>` não carrega hook, só
+  `settings.json` de disco. Sessão sem hook degrada para o comportamento antigo (`transcript-only`,
+  `unknown`, sem entrega); a UI continua dizendo "enviada ao agente", nunca "respondida".
+- **Kiro está fora**: nenhuma superfície de injeção equivalente foi encontrada, e o painel não
+  promete entrega lá.
