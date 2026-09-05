@@ -63,6 +63,13 @@ const CLAUDE_SESSIONS_DIR = path.join(CLAUDE_HOME, "sessions"); // <pid>.json
 const CLAUDE_IDE_DIR = path.join(CLAUDE_HOME, "ide"); // <porta>.lock
 const CLAUDE_PROJECTS_DIR = path.join(CLAUDE_HOME, "projects"); // <cwd-codificado>/<sessionId>.jsonl
 
+// Estado compartilhado com o hook do Claude Code (public/agent/claude-hook.mjs).
+// É por aqui que a resposta do painel entra numa sessão que roda sem terminal:
+// nós escrevemos no inbox, o hook drena no fim do turno de dentro da sessão.
+const STATE_DIR = process.env.LRC_STATE_DIR || path.join(HOME, ".lrc");
+const HOOK_SESSIONS_DIR = path.join(STATE_DIR, "sessions");
+const HOOK_INBOX_DIR = path.join(STATE_DIR, "inbox");
+
 const KIRO_HOME = path.join(HOME, ".kiro");
 const KIRO_SESSIONS_DIR = path.join(KIRO_HOME, "sessions"); // <wsHash>/sess_<uuid>/
 const KIRO_INDEX_DIR = path.join(KIRO_HOME, "session-index"); // <wsHash>.jsonl
@@ -400,6 +407,168 @@ function detectClaudeSessions(snap, pipes) {
   return sessions;
 }
 
+/**
+ * Sessões de Claude Code vistas pelo HOOK (public/agent/claude-hook.mjs).
+ *
+ * A detecção acima depende de `~/.claude/sessions/<pid>.json`, e a partir da
+ * 2.1.x esse arquivo não existe mais: sobrou `<pid>.<hash>.key`, que tem
+ * peerToken e procStart mas não tem sessionId nem cwd. Medido em 2026-09-04
+ * nesta máquina: 4 processos de Claude Code vivos, `--probe` enxergando ZERO
+ * sessão de Claude. A camada acima fica porque agente antigo ainda escreve o
+ * registro; ela só não é mais suficiente sozinha.
+ *
+ * Quem sabe o sessionId é a própria sessão, e o hook roda dentro dela. O
+ * registro que ele deixa é evidência de primeira mão — mas continua NÃO
+ * provando vida: hook não roda na hora do kill, então o arquivo sobrevive à
+ * morte abrupta igual ao registro antigo. A prova segue sendo PID vivo com
+ * start-time idêntico, e o que não passar nisso fica `unknown`.
+ */
+function detectClaudeFromHook(snap) {
+  const sessions = [];
+
+  for (const entry of listDir(HOOK_SESSIONS_DIR)) {
+    if (!entry.isFile() || !entry.name.startsWith("claude-") || !entry.name.endsWith(".json"))
+      continue;
+    const reg = readJson(path.join(HOOK_SESSIONS_DIR, entry.name));
+    if (!reg || typeof reg.session_id !== "string") continue;
+
+    const s = emptySession("claude-code", reg.session_id);
+    const sources = ["claude:hook"];
+    s.project = typeof reg.cwd === "string" ? reg.cwd : null;
+    s.started_at = reg.started_at ?? null;
+    s.pid = typeof reg.pid === "number" ? reg.pid : null;
+
+    // O hook viu a sessão terminar. É o único caminho em que sabemos a HORA do
+    // fim — o registro órfão de um kill nunca carrega isso.
+    if (reg.ended_at) {
+      s.status = "finished";
+      s.confidence = "confirmed";
+      s.ended_at = reg.ended_at;
+      s.evidence.push(`SessionEnd registrado pelo hook (${reg.end_reason ?? "sem motivo"})`);
+      s.detection_source = sources.join("+");
+      sessions.push(s);
+      continue;
+    }
+
+    // --- prova de vida, mesma régua da detecção antiga ---------------------
+    let alive = false;
+    if (s.pid == null) {
+      s.evidence.push("hook não conseguiu resolver o PID da sessão: vida não verificável");
+    } else if (snap.degraded) {
+      s.evidence.push("snapshot de processos indisponível: vida não verificável");
+    } else {
+      const proc = snap.byPid.get(s.pid);
+      if (!proc) {
+        s.evidence.push(`PID ${s.pid} não existe: registro órfão`);
+      } else if (!sameProcStart(proc.start, reg.proc_start)) {
+        s.evidence.push(`PID ${s.pid} existe com outro start-time: PID reciclado, não é a sessão`);
+      } else if (reg.proc_name && proc.name && proc.name !== reg.proc_name) {
+        s.evidence.push(
+          `PID ${s.pid} bate no start-time mas o nome mudou (${reg.proc_name} → ${proc.name}): inconsistente`,
+        );
+      } else {
+        alive = true;
+        sources.push("claude:process");
+        s.evidence.push(`PID ${s.pid} vivo com procStart idêntico (${reg.proc_start})`);
+      }
+    }
+
+    // --- IDE de origem, pela cadeia de pais até um lock vivo ---------------
+    if (alive) {
+      const liveLocks = claudeIdeLocks().filter((l) => snap.byPid.has(l.pid));
+      const chain = ancestorsOf(s.pid, snap.byPid);
+      const owner = liveLocks.find((l) => chain.includes(l.pid));
+      if (owner) {
+        s.ide = owner.ideName;
+        sources.push("claude:ide-lock");
+        s.evidence.push(
+          `ancestral PID ${owner.pid} é dono do lock ${owner.port} (${owner.ideName})`,
+        );
+      } else {
+        // Sem lock na cadeia NÃO quer dizer terminal. Cada IDE só escreve um
+        // lock por janela/workspace, e uma sessão hospedada por uma janela sem
+        // lock (ou de outro workspace) cai aqui igual a uma sessão de terminal.
+        // Verificado: o PID 28884 desta máquina é filho de um extension host e
+        // mesmo assim não bate lock nenhum. Chamar isso de "CLI" seria chute.
+        // O registro antigo tinha `entrypoint` para decidir; o hook não recebe
+        // esse campo, então ficamos sem saber — e sem saber, fica null.
+        s.evidence.push("nenhum lock de IDE viva na cadeia de pais: origem indeterminada");
+      }
+    }
+
+    // --- atividade ---------------------------------------------------------
+    // O hook entrega o caminho da transcrição, então não precisamos adivinhar a
+    // codificação da pasta do projeto como a detecção antiga precisa.
+    const transcript =
+      (typeof reg.transcript_path === "string" && fs.existsSync(reg.transcript_path)
+        ? reg.transcript_path
+        : null) ?? claudeTranscriptFor(reg.session_id);
+    if (transcript) {
+      const st = statOf(transcript);
+      if (st) {
+        sources.push("claude:transcript");
+        s.last_activity_at = iso(st.mtimeMs);
+      }
+    }
+    // Bater ponto a cada turno é atividade tanto quanto escrever na transcrição.
+    if (reg.last_seen_at && (!s.last_activity_at || reg.last_seen_at > s.last_activity_at)) {
+      s.last_activity_at = reg.last_seen_at;
+    }
+
+    // --- status -------------------------------------------------------------
+    if (!alive) {
+      // Sem prova de vida NÃO dizemos "finished": o hook pode estar instalado
+      // numa versão que não resolve PID, e aí a sessão pode muito bem estar
+      // rodando. O que não se sabe fica `unknown` até o banco e a tela.
+      s.status = s.pid == null || snap.degraded ? "unknown" : "finished";
+      s.confidence = s.status === "finished" ? "confirmed" : "unknown";
+    } else {
+      const idleMs = s.last_activity_at ? Date.now() - Date.parse(s.last_activity_at) : Infinity;
+      s.status = idleMs < 60000 ? "active" : "idle";
+      s.confidence = "confirmed";
+    }
+
+    s.detection_source = sources.join("+");
+    sessions.push(s);
+  }
+
+  return sessions;
+}
+
+/**
+ * Junta as duas detecções de Claude Code sem duplicar sessão.
+ *
+ * As duas podem ver a MESMA sessão (registro antigo em disco + hook instalado).
+ * Duplicar aqui viraria duas linhas no painel para a mesma conversa. Quando
+ * ambas vêem, vale a que tem PID resolvido — sem PID não há prova de vida — e o
+ * empate fica com o hook, que é evidência de dentro da sessão.
+ */
+function mergeClaude(doRegistro, doHook) {
+  const porId = new Map();
+  for (const s of [...doRegistro, ...doHook]) {
+    const anterior = porId.get(s.session_id);
+    if (!anterior) {
+      porId.set(s.session_id, s);
+      continue;
+    }
+    const vencedor = anterior.pid != null && s.pid == null ? anterior : s;
+    const perdedor = vencedor === s ? anterior : s;
+    vencedor.detection_source = [
+      ...new Set([
+        ...vencedor.detection_source.split("+"),
+        ...perdedor.detection_source.split("+"),
+      ]),
+    ]
+      .filter(Boolean)
+      .join("+");
+    vencedor.project = vencedor.project ?? perdedor.project;
+    vencedor.ide = vencedor.ide ?? perdedor.ide;
+    vencedor.title = vencedor.title ?? perdedor.title;
+    porId.set(s.session_id, vencedor);
+  }
+  return [...porId.values()];
+}
+
 // ---------------------------------------------------------------------------
 // adaptador: KIRO
 // ---------------------------------------------------------------------------
@@ -666,7 +835,10 @@ const seenAlive = new Map();
 function monitorScan() {
   const snap = osSnapshot();
   const pipes = openPipes();
-  const found = [...detectClaudeSessions(snap, pipes), ...detectKiroSessions(snap)];
+  const found = [
+    ...mergeClaude(detectClaudeSessions(snap, pipes), detectClaudeFromHook(snap)),
+    ...detectKiroSessions(snap),
+  ];
 
   const now = Date.now();
   const present = new Set();
@@ -1249,8 +1421,12 @@ async function postSync(session, messages) {
 function deliverReplies(data, label) {
   for (const reply of data?.replies ?? []) {
     const daSessaoSincronizada = !reply.session_id || reply.session_id === data.session_id;
-    const origem = daSessaoSincronizada ? label : `outra sessão (${reply.session_id})`;
+    const externalId = reply.external_id ?? (daSessaoSincronizada ? data.external_id : null);
+    const origem = daSessaoSincronizada
+      ? label
+      : `outra sessão (${externalId ?? reply.session_id})`;
     console.log(`\n>> resposta remota para ${origem}:\n${reply.content}\n`);
+    entregarNaSessao(externalId, reply);
     if (REPLY_FILE) fs.appendFileSync(REPLY_FILE, `${reply.content}\n`);
     if (REPLY_CMD) {
       const cmd = REPLY_CMD.replaceAll("{{reply}}", reply.content.replace(/"/g, '\\"')).replaceAll(
@@ -1259,6 +1435,42 @@ function deliverReplies(data, label) {
       );
       exec(cmd, (err) => err && console.error("comando de resposta falhou:", err.message));
     }
+  }
+}
+
+/**
+ * Põe a resposta no inbox da sessão de destino, para o hook drenar de dentro
+ * dela no fim do turno. É o que faz a resposta sair do console e chegar na
+ * sessão de IA.
+ *
+ * O endereçamento é pelo `external_id` ("claude-code:<sessionId>"), nunca pelo
+ * uuid do banco: o invariante é não escrever na sessão errada, e sem o id nativo
+ * não dá para afirmar qual é a certa. Sem `external_id` (servidor antigo) não
+ * escrevemos em lugar nenhum — a resposta segue aparecendo no console e nos
+ * canais de sempre, como antes desta mudança.
+ *
+ * Só Claude Code por enquanto. Kiro não tem superfície equivalente comprovada,
+ * e prometer entrega onde não foi provado é exatamente o que o contrato proíbe.
+ */
+function entregarNaSessao(externalId, reply) {
+  if (typeof externalId !== "string") return;
+  const sep = externalId.indexOf(":");
+  const agent = externalId.slice(0, sep);
+  const sessionId = externalId.slice(sep + 1);
+  if (agent !== "claude-code" || !sessionId) return;
+
+  const nome = `claude-${sessionId.replace(/[^A-Za-z0-9._-]/g, "_").slice(0, 120)}.jsonl`;
+  try {
+    fs.mkdirSync(HOOK_INBOX_DIR, { recursive: true });
+    // Append de propósito: o hook toma o arquivo inteiro com rename, então uma
+    // resposta que chegue no meio da drenagem cai no arquivo seguinte em vez de
+    // sumir. Uma linha por resposta preserva a ordem em que o usuário escreveu.
+    fs.appendFileSync(
+      path.join(HOOK_INBOX_DIR, nome),
+      `${JSON.stringify({ id: reply.id, content: reply.content, at: new Date().toISOString() })}\n`,
+    );
+  } catch (err) {
+    console.error("não consegui enfileirar a resposta para o hook:", err.message);
   }
 }
 

@@ -23,14 +23,19 @@ Hoje o round-trip entrega a resposta ao agente e para ali: o `deliverReplies()` 
 ## Escopo
 
 **DENTRO:**
+
 - Entregar o texto da resposta na sessão de IA que a originou, não só no console do agente.
 - Caso do prompt de permissão (`AskUserQuestion` / aprovação de ação): é MODAL e bloqueante, e precisa de uma tecla, não de uma linha de texto. Se o caminho escolhido não cobrir isso, dizer explicitamente que não cobre.
 - Descobrir e registrar QUAL é o caminho viável por IDE (Claude Code e Kiro têm superfícies diferentes) antes de implementar.
+- **[somado 2026-09-04 22:00, decisão do usuário]** Voltar a detectar sessões de Claude Code. A detecção por `~/.claude/sessions/<pid>.json` está inoperante nesta máquina (4 sessões vivas, `--probe` achando zero). Sem sujeito não há como provar os critérios 1 e 3 — é pré-requisito, não item paralelo.
+- **[somado 2026-09-04 22:00, decisão do usuário]** Somar `external_id` a cada reply na RESPOSTA do `/sync`. Sem isso o agente recebe o uuid da tabela e não sabe para qual sessão nativa é — o invariante de nunca escrever na sessão errada fica impossível de honrar.
 
 **FORA:**
+
 - Websocket/Realtime — o round-trip do POST continua sendo o protocolo.
-- Mudar o formato do payload de `/sync`.
+- Redesenhar o protocolo do `/sync`: corpo da requisição e fluxo não mudam. (O `external_id` na resposta é aditivo e entrou por decisão explícita do usuário — ver DENTRO.)
 - Prometer entrega em IDE que não tenha caminho comprovado: o que não for provável fica de fora e a UI não promete.
+- **Kiro.** Nenhuma superfície de injeção equivalente foi encontrada na investigação. Fica de fora até existir prova, e a UI não promete entrega para sessão do Kiro.
 
 ## Invariantes
 
@@ -40,24 +45,34 @@ Hoje o round-trip entrega a resposta ao agente e para ali: o `deliverReplies()` 
 
 ## Implementação
 
-Porte G, e a primeira fase é INVESTIGAÇÃO, não código. O que já se sabe e limita o desenho:
+Porte G, e a primeira fase é INVESTIGAÇÃO, não código. **Fase 1 fechada em 2026-09-04 21:55** — o
+resultado derrubou a hipótese que este parágrafo trazia. Registro do que caiu e do que ficou:
 
-- O Claude Code interativo não expõe porta de entrada externa. `claude --resume <id> -p "..."` abre um processo headless novo; ele NÃO fala com o terminal aberto, então não serve para desbloquear a sessão que o usuário está olhando.
-- Sobra automação de janela no SO (no Windows, `SendKeys` para a janela do terminal por título/PID). Funciona, e é frágil por natureza: depende de foco, de layout de janela e do usuário não estar digitando.
-- O agente já sabe o PID da sessão (o session monitoring prova vida por PID + start-time), então "qual processo" é uma pergunta que já tem resposta — o que falta é "como escrever nele".
-- Hooks do Claude Code e o protocolo do Kiro são superfícies ainda não investigadas e podem ser o caminho limpo.
+- ~~Sobra automação de janela no SO (`SendKeys` para a janela do terminal por PID)~~ — **descartado, não adiado.** As sessões que o usuário roda são `claude.exe --input-format stream-json --permission-prompt-tool stdio`, filhas do host da IDE: stdin é pipe, não há console nem janela. Não é frágil, é sem alvo. E o modal de permissão é desenhado pelo host, não por um TTY: também não há tecla para mandar.
+- `claude --resume <id> -p` segue descartado pelo motivo original: abre processo novo, não fala com a sessão aberta.
+- **Caminho escolhido: hooks do Claude Code.** O hook roda DENTRO da sessão e recebe o `session_id` dela.
+  - `Stop` → `{"hookSpecificOutput":{"hookEventName":"Stop","decision":"block","reason":"<fala do usuário>"}}`: a sessão não para e recebe o texto como instrução. É a entrega.
+  - `SessionStart`/`SessionEnd` → registram sessão, PID e start-time em `~/.lrc/sessions/`, que é o que devolve a detecção de Claude ao monitor.
+  - `PreToolUse` → aceita `permissionDecision: allow|deny`; é por onde o prompt de permissão pode ser destravado. **Fase 3, ainda não desenhada.**
+- Transporte agente↔hook por arquivo (`~/.lrc/inbox/claude-<sessionId>.jsonl`), não por porta. O agente escreve com append, o hook drena com `rename` atômico. `LRC_REPLY_FILE`/`LRC_REPLY_CMD` continuam sendo chamados como sempre.
+- Efeito colateral bom: o invariante "nunca digitar na sessão errada" deixa de ser risco a mitigar. O hook só existe dentro da sessão de destino.
+- Restrição de instalação, medida: hook passado por `--settings <arquivo>` NÃO é carregado. Só vale `settings.json` em disco — logo, instalar o hook é passo manual do usuário (`evidence/instalar-hook.md`).
 
 ### Modelo de dados
 
-| Entidade | Campos / mudança |
-|---|---|
-| — | Nenhuma mudança prevista; a resposta já viaja com o `session_id` de origem desde a SPEC-20260904-2036. |
+| Entidade                      | Campos / mudança                                                                                                                                                                          |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Tabelas                       | Nenhuma mudança. A resposta já viaja com o `session_id` de origem desde a SPEC-20260904-2036.                                                                                             |
+| Resposta do `/sync` (aditivo) | cada reply ganha `external_id`; a raiz ganha `external_id` da sessão sincronizada. É o dicionário uuid→id nativo que faltava ao agente. Sai da consulta que já existia, sem query a mais. |
+| `~/.lrc/` (novo, em disco)    | `sessions/claude-<sid>.json` escrito pelo hook (pid, proc_start, cwd, transcript, last_seen, ended_at) · `inbox/claude-<sid>.jsonl` escrito pelo agente e drenado pelo hook.              |
 
 ## Riscos
 
-- Automação de teclado digita na janela errada se o foco mudar — mitigação: mirar por PID/handle, nunca por "janela ativa"; e não implementar se não der para mirar com segurança.
-- Injetar texto numa sessão de IA é uma superfície de execução: quem tem o token do agente passa a poder digitar na máquina. Mitigação a desenhar — hoje o token já permite ler transcrições, mas escrever é um degrau acima.
-- Pode não haver caminho confiável para algum IDE — mitigação: entregar por IDE, e a UI só promete onde foi provado.
+- ~~Automação de teclado digita na janela errada~~ — risco extinto junto com a abordagem: o hook roda dentro da sessão de destino, não existe "janela errada" para acertar.
+- Injetar texto numa sessão de IA é uma superfície de execução: quem tem o token do agente passa a poder digitar na máquina. Mitigação a desenhar — hoje o token já permite ler transcrições, mas escrever é um degrau acima. **Continua em aberto.**
+- Pode não haver caminho confiável para algum IDE — confirmado para o Kiro, que ficou FORA.
+- **Novo:** o hook roda em TODA sessão de Claude Code da máquina, a cada turno. Um erro nele para o trabalho do usuário em todos os repositórios. Mitigação implementada: qualquer falha termina em `exit 0` sem saída, e `LRC_HOOK=0` desliga sem desinstalar.
+- **Novo:** instalar o hook é passo manual e o usuário pode esquecer numa das máquinas. Mitigação: sessão sem hook continua aparecendo como hoje (`transcript-only`, `unknown`) e não recebe entrega — degrada para o comportamento atual, não para um estado mentiroso.
 
 ## Sinais de sucesso
 
@@ -69,5 +84,7 @@ Porte G, e a primeira fase é INVESTIGAÇÃO, não código. O que já se sabe e 
 - [ ] Prompt de permissão aberto é desbloqueado pela escolha feita no painel — OU está escrito no contrato que este caso ficou fora, e a UI não o promete
 - [ ] Resposta para a sessão A nunca é digitada na sessão B, nem em outra máquina do mesmo usuário
 - [ ] `LRC_REPLY_FILE` e `LRC_REPLY_CMD` continuam funcionando como hoje
+- [ ] **[somado 2026-09-04 22:00]** `--probe` volta a enxergar sessões de Claude Code vivas, com `confiança=confirmed` e prova de vida por PID + start-time (hoje enxerga zero)
+- [ ] **[somado 2026-09-04 22:00]** Sessão de Claude Code SEM o hook instalado continua aparecendo como hoje (`unknown`/`transcript-only`) e não recebe entrega — degradar não pode virar mentira
 - [ ] Typecheck limpo | verify: `bunx tsc --noEmit`
 - [ ] Lint limpo | verify: `bun run lint`

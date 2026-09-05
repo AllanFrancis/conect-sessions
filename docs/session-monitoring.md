@@ -36,6 +36,56 @@ O Claude Code escreve **um arquivo por processo** em `~/.claude/sessions/<pid>.j
 
 Isto dá de graça: session id nativo, projeto, horário de início e o PID.
 
+> **Esta fonte parou de aparecer (medido em 2026-09-04, SPEC-20260904-2135).** Nesta máquina havia 4
+> processos `claude.exe` vivos e `~/.claude/sessions/` só tinha arquivos `.key`
+> (`{"peerToken","procStartFt"}` — sem `sessionId`, sem `cwd`), todos de agosto. Resultado: `--probe`
+> listava 11 sessões, ZERO de Claude Code. O exemplo acima é real e foi capturado na versão
+> **2.1.259**; a extensão instalada hoje é a **2.1.260**. O que está provado é que a 2.1.260 não
+> escreve esse registro — não que o formato tenha sido removido do produto.
+>
+> A fonte fica no código: quem estiver numa versão que ainda escreve o registro continua detectado
+> por ela. O que mudou é que ela deixou de ser suficiente sozinha — ver a seção seguinte.
+
+### Fonte de primeira mão — o hook (`public/agent/claude-hook.mjs`)
+
+Quem sempre sabe o `sessionId` é a própria sessão. O hook roda dentro dela e deixa o
+registro em `~/.lrc/sessions/claude-<sessionId>.json` (`LRC_STATE_DIR` muda a raiz):
+
+```json
+{
+  "agent": "claude-code",
+  "session_id": "11111111-2222-3333-4444-555555555555",
+  "cwd": "c:/dev/x",
+  "transcript_path": "…/projects/<enc>/<sessionId>.jsonl",
+  "pid": 28884,
+  "proc_name": "claude.exe",
+  "proc_start": "134330459272199166",
+  "started_at": "…",
+  "last_seen_at": "…",
+  "ended_at": null
+}
+```
+
+O PID sai de uma subida na árvore de processos a partir do próprio hook, pulando as
+cascas de shell (`cmd.exe`, `bash.exe`, `powershell.exe`…) — roda uma vez só, no
+`SessionStart`. Verificado: achou `claude.exe` PID 28884 com `proc_start` batendo com
+o snapshot do monitor.
+
+Três coisas que este registro **não** muda:
+
+- **Não prova vida.** Hook não roda na hora de um kill, então o arquivo sobrevive à
+  morte abrupta exatamente como o registro antigo. A prova continua sendo PID vivo
+  com `procStart` idêntico.
+- **Não inventa IDE.** Se nenhum lock de IDE viva aparece na cadeia de pais, `ide`
+  fica `null`. Uma sessão hospedada por IDE pode não bater lock nenhum (medido no PID
+  28884), então chamar isso de "CLI" seria chute.
+- **Não é obrigatório.** Sessão sem o hook instalado continua detectada só pela
+  transcrição, como `transcript-only` / `unknown` — degrada para o comportamento de
+  antes, não para um estado falso.
+
+Único caso em que sabemos a HORA do fim de uma sessão: `SessionEnd` registrado pelo
+hook. Registro órfão de kill nunca carrega isso.
+
 ### Prova de vida — PID **e** `procStart`
 
 `procStart` é o FILETIME de criação do processo (100 ns desde 1601). A sessão só é

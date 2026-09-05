@@ -2,51 +2,60 @@
 
 ## SNAPSHOT (sobrescrever — DEVE caber nas primeiras 60 linhas do arquivo)
 
-**Última atualização:** 2026-09-04 21:55
-**Onde tô:** fase 1 (investigação) ENTREGUE. Nenhuma linha de produto tocada — de propósito.
-**Próximo passo:** o usuário decide as 3 perguntas em "Dúvidas"; sem isso a fase 2 não começa.
-**Última decisão:** canal = hooks `Stop`/`PreToolUse` do Claude Code; automação de teclado descartada.
-**Bloqueio atual:** provar o hook exige instalar em settings.json de disco (ver [blocker] 21:55).
-**Se retomar, ler:** main.md, depois os 3 LOGs de 21:54–21:55 (descoberta → decisão → blocker).
+**Última atualização:** 2026-09-04 22:14
+**Onde tô:** fases 1 e 2 entregues. Código pronto, typecheck e lint limpos. Falta UMA prova.
+**Próximo passo:** usuário cola `evidence/instalar-hook.md` no settings.json e roda o teste do
+ABACAXI. Sessão continuou sozinha → critério #1 fecha. Não continuou → o canal caiu, fase 1 reabre.
+**Última decisão:** canal = hook `Stop`; detecção de Claude também pelo hook; `external_id` no /sync.
+**Bloqueio atual:** só o passo manual de instalar o hook (classifier barra a escrita no settings.json).
+**Se retomar, ler:** main.md e os LOGs 21:54 → 22:14 na ordem ([nota] 22:14 corrige [descoberta] 21:54).
 
 ### Fases
-| # | Descrição | Status | Atualizado |
-|---|---|---|---|
-| 1 | Investigação: qual o caminho viável por IDE | concluída | 2026-09-04 21:55 |
-| 2 | Hook + spool + roteamento por sessão | bloqueada (decisão do usuário) | 2026-09-04 21:55 |
-| 3 | Caso do prompt de permissão (PreToolUse) — ou declarar fora | pendente | 2026-09-04 21:55 |
+
+| #   | Descrição                                  | Status                   | Atualizado       |
+| --- | ------------------------------------------ | ------------------------ | ---------------- |
+| 1   | Investigação: caminho viável por IDE       | concluída                | 2026-09-04 21:55 |
+| 2   | Hook + inbox + roteamento + detecção       | código pronto, sem prova | 2026-09-04 22:25 |
+| 3   | Prompt de permissão (PreToolUse) — ou fora | pendente (após fase 2)   | 2026-09-04 22:25 |
 
 ### Fatos confirmados / Inferências prováveis / Dúvidas em aberto
-<!-- anti-alucinação por estrutura: separe o que é SABIDO (verificado no código/teste) do que é CHUTE (inferido) do que está EM ABERTO. Nunca trate inferência como fato. -->
-- fato: as sessões Claude do usuário são `claude.exe` da extensão, stream-json por pipe, SEM console
-  → SendKeys/WriteConsoleInput não têm alvo. Automação de janela está descartada, não adiada.
-- fato: `~/.claude/sessions/<pid>.json` não existe na 2.1.x (só `<pid>.<hash>.key` com peerToken +
-  procStartFt, sem sessionId/cwd) → `--probe` acha 11 sessões, 0 Claude. Detecção de Claude morta.
-- fato: doc oficial confirma `Stop` → `decision:block`+`reason` e `PreToolUse` → `permissionDecision`.
-- fato: hook via `--settings <arquivo>` NÃO carrega (2 execuções reais, nem SessionStart nem Stop).
-- fato: `replies` do /sync devolve uuid da tabela, não id nativo → agente não sabe rotear hoje.
-- inferência: `~/.claude/session-env/` é o registro novo de pid↔sessionId (NÃO lido — bloqueado).
+
+- fato: sessões Claude do usuário = `claude.exe` da extensão, stream-json por pipe, SEM console →
+  SendKeys/WriteConsoleInput não têm alvo. Automação de janela descartada, não adiada.
+- fato: com 4 `claude.exe` vivos, `--probe` achava 0 sessões de Claude. A 2.1.260 não escreve o
+  registro que a 2.1.259 escrevia — NÃO provado que o formato saiu do produto (ver [nota] 22:14).
+- fato: doc oficial confirma `Stop`→`decision:block`+`reason` e `PreToolUse`→`permissionDecision`;
+  e hook via `--settings <arquivo>` NÃO carrega (2 execuções reais). Só settings.json de disco.
+- fato: o hook drena o inbox e emite o `decision:block` correto; a resolução de PID achou
+  `claude.exe` 28884 com `proc_start` batendo; com esse registro o agente lista a sessão com
+  `confiança=confirmed` (antes: zero).
 - inferência: Kiro não tem superfície de injeção equivalente (procurei, não achei; não é prova).
-- dúvida: o usuário autoriza instalar o hook em `~/.claude/settings.json` para provar?
-- dúvida: somar `external_id` ao reply do /sync (aditivo) ou o agente montar o mapa sozinho?
-- dúvida: consertar a detecção de Claude aqui dentro ou abrir SPEC própria?
+  Entrou como FORA no main.md, e a UI não promete entrega lá.
+- dúvida: o Claude Code honra `decision:"block"`? É o único elo não provado. E na fase 3, como armar
+  o `PreToolUse` sem travar quem está na máquina — o risco do token segue sem mitigação.
 
 ### Respostas-chave do usuário
-- 2026-09-04 21:39 — "Abrir a 1. Seja autonomo e corrija"
+
+- 21:39 "Abrir a 1. Seja autonomo e corrija" · 22:00 autorizou instalar o hook no settings.json,
+  "Somar external_id ao reply" e "Consertar dentro desta SPEC" (detecção entra no escopo)
 
 ### Tentativas que falharam
-- hook por `--settings ./hooks-de-teste.json` (com e sem `--setting-sources`): nenhum hook rodou.
-- escrever `.claude/settings.json` no fixture, redirecionar stderr p/ arquivo, ler `session-env/`:
-  barrados pelo classifier de permissões. Não contornados.
+
+- hook por `--settings` (com e sem `--setting-sources`): nenhum hook rodou.
+- escrever settings.json (projeto e global), redirecionar stderr, ler `session-env/` (vazio):
+  barrados pelo classifier, não contornados. E o detector rotulava `ide=CLI` sem prova → `null`.
 
 ### Arquivos tocados
-- nenhum de produto. Só journal + `tmp/` (fixture `tmp/hooktest/`, corpos dos LOGs).
+
+- `claude-hook.mjs` (novo) · `remote-agent.mjs` · `sync.ts` · `docs/session-monitoring.md` · main.md
 
 ### Onde parei
-Investigação fechada e registrada. Esperando as 3 decisões do usuário antes de codar.
+
+Código das fases 1 e 2 pronto, gates limpos. Falta o usuário instalar o hook e rodar o ABACAXI.
 
 ### Sessões (máx 5 linhas + 1 agregada)
-- 2026-09-04 21:39–21:55 — ativação + fase 1 inteira (investigação, decisão de canal, blocker).
+
+- 2026-09-04 21:39–22:25 — ativação, fase 1 (investigação) e fase 2 (hook + inbox + detecção).
 
 ## LOG (append-only — NUNCA editar entradas antigas)
 <!-- tipos: ativação descoberta decisão tentativa blocker unblock refactor nota conclusão | entrada nova: specctl log -->
@@ -179,3 +188,50 @@ main.md manda investigar antes de codar, e o invariante "NUNCA prometer na UI o 
 máquina" vale primeiro para mim. Nada de UI foi tocado, nada foi prometido.
 Fixture da tentativa preservado em `tmp/hooktest/` (script do hook + settings de teste).
 ⎿ commit 35b501b+dirty · 1 file changed, 104 insertions(+), 1 deletion(-)
+
+## 2026-09-04 22:14 — [nota] Correcao de precisao sobre o registro nativo + decisoes do usuario + metade do canal provada
+
+**Correção de precisão da [descoberta] das 21:54, item 2.**
+
+Escrevi que `~/.claude/sessions/<pid>.json` "não existe mais na 2.1.x". A medição está certa, a
+causa foi afirmada além do que provei. O que está PROVADO, reconferido às 22:15:
+
+- `~/.claude/sessions/` tem 8 arquivos, todos `.key`, de 20–25/ago. Zero `.json`.
+- Há 4 processos `claude.exe` VIVOS agora. Nenhum deles tem `<pid>.json`.
+- `--probe` acha 11 sessões, zero de Claude. Reproduzível.
+
+O que NÃO está provado: que o formato foi removido. O próprio `docs/session-monitoring.md` §1 traz um
+`<pid>.json` real com `"version": "2.1.259"` e `"entrypoint": "claude-vscode"` — extensão, não
+terminal — e a extensão instalada hoje é a **2.1.260**. Então a leitura honesta é "a 2.1.260 não
+escreve o registro que a 2.1.259 escrevia", e não "o registro acabou". Pode ser mudança de formato,
+de local, ou condicional a algo que não isolei.
+
+Não muda nenhuma decisão: a detecção por registro nativo está inoperante nesta máquina hoje, e o
+registro do hook é a fonte que não depende de qual versão o Claude Code está rodando. A camada antiga
+fica no código de propósito, para quem estiver numa versão que ainda a escreve.
+
+**Decisões do usuário (2026-09-04 22:00), as três recomendadas:**
+
+1. "Instalar em ~/.claude/settings.json" — autorizado instalar o hook no settings global.
+2. "Somar external_id ao reply" — mudança aditiva no /sync liberada.
+3. "Consertar dentro desta SPEC" — a detecção de Claude entra no escopo desta SPEC.
+
+**Provado nesta rodada (metade do caminho):**
+
+- O hook drena o inbox e emite o JSON certo: entrada com 2 respostas semeadas → saída
+  `{"hookSpecificOutput":{"hookEventName":"Stop","decision":"block","reason":"...pode seguir,
+aprovado\n\ne roda o lint depois"}}`, inbox apagado, registro criado.
+- A resolução de PID pela árvore de processos funciona de verdade: o hook subiu de si mesmo,
+  pulou as cascas (`bash.exe`) e achou `claude.exe` **PID 28884** com
+  `proc_start=134330459272199166` — que é exatamente uma das 4 sessões vivas medidas às 21:41.
+- O agente lê esse registro e mostra a sessão: `[ACTIVE] claude-code ... pid=28884
+confiança=confirmed fontes=claude:hook+claude:process`. Antes disso o probe não via Claude nenhum.
+- Corrigido no meio do caminho: a primeira versão rotulava `ide=CLI` quando nenhum lock batia na
+  cadeia de pais. Errado — o PID 28884 é hospedado por IDE e mesmo assim não bate lock. Virou
+  `ide=null` com evidência "origem indeterminada", que é o que se sabe.
+
+**O que continua NÃO provado, e é o critério #1:** que o Claude Code honra `decision:"block"` e
+injeta o `reason` na sessão. Depende de instalar o hook no settings.json, e o classifier de permissões
+desta sessão barra a escrita nesse arquivo mesmo com a autorização do usuário. Snippet pronto em
+`evidence/instalar-hook.md` para ele colar.
+⎿ commit b4fcff1+dirty · 66 files changed, 1323 insertions(+), 517 deletions(-)

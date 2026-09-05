@@ -188,7 +188,7 @@ export const Route = createFileRoute("/api/public/agent/sync")({
         // ser entregue no terminal da outra.
         const { data: minhasSessoes } = await supabaseAdmin
           .from("sessions")
-          .select("id")
+          .select("id, external_id")
           .eq("agent_id", agent.id);
         const idsDoAgente = (minhasSessoes ?? []).map((s) => s.id);
 
@@ -201,9 +201,23 @@ export const Route = createFileRoute("/api/public/agent/sync")({
 
         // O UPDATE não aceita `order`, e a ordem importa: são falas do usuário,
         // que chegam ao terminal na sequência em que ele as escreveu.
-        const replies = (entregues ?? []).sort((a, b) => a.created_at.localeCompare(b.created_at));
+        const ordenadas = (entregues ?? []).sort((a, b) =>
+          a.created_at.localeCompare(b.created_at),
+        );
 
-        return json({ session_id: session.id, replies });
+        // `session_id` é o uuid DESTA tabela, e o agente não tem esse dicionário:
+        // ele conhece a sessão pelo id nativo ("claude-code:<uuid da sessão>").
+        // Sem traduzir, o agente sabia que chegou resposta mas não para QUAL
+        // sessão da máquina — e o invariante é justamente nunca escrever na
+        // sessão errada. O dicionário sai da consulta que já fizemos acima, de
+        // graça: só passamos a pedir `external_id` junto com o `id`.
+        const externalPorId = new Map((minhasSessoes ?? []).map((s) => [s.id, s.external_id]));
+        const replies = ordenadas.map((r) => ({
+          ...r,
+          external_id: externalPorId.get(r.session_id) ?? null,
+        }));
+
+        return json({ session_id: session.id, external_id: parsed.session.external_id, replies });
       },
     },
   },
