@@ -16,6 +16,7 @@
 ### Concluídas
 - SPEC-20260904-1433 | 2026-09-04 | `fc53ff4` | Painel lista apenas sessões ativas
 - SPEC-20260904-1457 | 2026-09-04 | `f4437f4` | Transcrição formatada, pergunta clicável e adaptador do Kiro
+- SPEC-20260904-2036 | 2026-09-04 | `e1de995` | Sync resiliente: entrega atômica de reply e cursor com confirmação
 ### Planejadas (future/)
 
 ## Estado atual
@@ -58,8 +59,32 @@ O agente ganhou adaptador por IDE em `normalize()`: o Claude Code põe `role`/`c
 em `message`, o Kiro envelopa tudo em `payload`. Raciocínio do Kiro (`operationType: "Reasoning"`)
 entra marcado com `meta.kind`, para a UI desenhá-lo esmaecido em vez de confundir com fala.
 
+### Delta de estado (SPEC-20260904-2036, 2026-09-04 21:00)
+
+O round-trip ganhou as três garantias que faltavam para ele ser confiável sob rede ruim:
+
+- **Entrega de reply é atômica.** O handler marca e devolve no MESMO `UPDATE ... RETURNING`,
+  filtrando `status = 'pending'`. Antes eram duas operações e dois syncs concorrentes da mesma
+  sessão levavam a mesma linha — o `LRC_REPLY_CMD` do usuário rodava três vezes.
+- **O cursor do arquivo só anda com confirmação.** `readNew()` devolve `nextOffset` e quem grava
+  é o `tick()`, depois que todos os lotes voltaram ok. Antes o cursor avançava antes do POST, e
+  qualquer falha descartava aquelas mensagens para sempre naquela execução.
+- **Um tick por vez.** Laço auto-agendado no lugar do `setInterval`, com concorrência limitada
+  (`LRC_CONCURRENCY`, padrão 4) no passo de estado. O intervalo virou período: dorme o que sobra
+  dele, com piso de 25% para não martelar servidor degradado.
+
+`postSync()` retenta transporte e 5xx, não retenta 4xx, e nomeia a causa no log.
+
 ## Decisões arquiteturais ativas
 
+- DEC-20260904-2100-entrega-no-maximo-uma-vez [ativa] (SPEC-20260904-2036) — a entrega de reply é
+  atômica e portanto **no máximo uma vez**: se a conexão cair entre o commit e o agente receber, a
+  resposta se perde. Trade-off aceito conscientemente — entregar de novo era pior, porque o
+  `LRC_REPLY_CMD` do usuário executava o mesmo comando N vezes. "Exatamente uma vez" exigiria ack
+  do agente, ou seja, protocolo novo.
+- DEC-20260904-2101-cursor-com-confirmacao [ativa] (SPEC-20260904-2036) — o offset de leitura só
+  avança depois que o servidor confirmou. Trade-off: uma falha faz o mesmo lote ser reenviado no
+  tick seguinte, o que é barato porque o upsert é idempotente por `(session_id, external_id)`.
 - DEC-20260904-1658-meta-aditivo [ativa] (SPEC-20260904-1457) — o que não cabe em `content` viaja
   numa coluna `meta` jsonb, opcional e sem esquema no zod do endpoint: o agente pode ganhar chaves
   sem a API mudar, e agente antigo numa máquina não atualizada continua funcionando. Trade-off: a
@@ -76,6 +101,12 @@ entra marcado com `meta.kind`, para a UI desenhá-lo esmaecido em vez de confund
 
 - SPEC-20260904-1433 | filtrar no cliente e manter todas as linhas no cache — rejeitada em
   2026-09-04 14:43. Traria linhas que seriam descartadas na renderização, a cada 3 segundos.
+- SPEC-20260904-2036 | fila persistente em disco no agente — rejeitada em 2026-09-04 20:36. O
+  defeito era perda DENTRO de uma execução; o cursor em memória corrigido basta, e um arquivo de
+  fila traz corrupção e limpeza para um agente que é de propósito um arquivo único sem estado.
+- SPEC-20260904-2036 | `SELECT ... FOR UPDATE SKIP LOCKED` — rejeitada em 2026-09-04 20:36. Dá a
+  mesma garantia, mas exigiria função/RPC no banco; o `UPDATE ... RETURNING` do PostgREST resolve
+  sem superfície nova.
 - SPEC-20260904-1457 | instalar `@tailwindcss/typography` — rejeitada em 2026-09-04 15:25. Traz um
   estilo genérico que briga com os tokens oklch e as primitivas de terminal; o mapa `components`
   custa o mesmo e combina.
@@ -90,6 +121,18 @@ entra marcado com `meta.kind`, para a UI desenhá-lo esmaecido em vez de confund
 - SPEC-20260904-1433 | sessão recém-aberta aparece como `idle`, não `active` (o processo está vivo
   mas a transcrição ainda não se moveu) — com o filtro de ativas, ela só surge no painel depois do
   primeiro turno. Não é bug do painel: a derivação de status vive no agente local.
+- SPEC-20260904-2036 | ler-depois-escrever num endpoint chamado em paralelo é corrida (2026-09-04
+  20:37) — o `SELECT` de pendentes seguido de `UPDATE` entregava o mesmo reply a cada sync em voo.
+  Em endpoint que o agente chama concorrentemente, marcar e devolver têm que ser UM comando.
+- SPEC-20260904-2036 | não mova cursor antes de a escrita ser confirmada (2026-09-04 20:37) — vale
+  para qualquer leitura incremental: avançar o offset antes do POST fez uma tempestade de 500
+  apagar uma tarde inteira de transcrição, em silêncio.
+- SPEC-20260904-2036 | `setInterval` com trabalho assíncrono dentro empilha (2026-09-04 20:37) — o
+  timer não espera o tick anterior; com latência real ficavam ~4 em voo. Use laço auto-agendado, e
+  trate o intervalo como período (dormir o que sobra), não como pausa.
+- SPEC-20260904-2036 | harness precisa ser capaz de FALHAR (2026-09-04 20:59) — o teste de
+  sobreposição passava nos dois agentes porque o servidor falso respondia rápido demais. Sempre
+  rode o harness contra a versão anterior para provar que ele enxerga o defeito.
 - SPEC-20260904-1457 | cada IDE tem envelope de transcrição PRÓPRIO (2026-09-04 16:03) — o Kiro
   envelopa tudo em `{id, timestamp, payload}`, e o `normalize()` escrito para o Claude Code
   descartava 2761 de 2761 linhas em silêncio: a sessão aparecia no painel e a conversa não, porque
