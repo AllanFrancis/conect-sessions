@@ -226,15 +226,16 @@ function aoParar(input) {
   if (respostas.length === 0) return null;
 
   const corpo = respostas.join("\n\n");
+  // `decision`/`reason` são TOP-LEVEL no evento Stop. Medido em 2026-09-05: com o
+  // par aninhado em `hookSpecificOutput` o Claude Code drena o inbox e IGNORA a
+  // decisão - o turno encerra e a fala do usuário some. Aninhado é a forma do
+  // PreToolUse, não a deste evento.
   return {
-    hookSpecificOutput: {
-      hookEventName: "Stop",
-      decision: "block",
-      reason:
-        "Mensagem do usuário, enviada agora pelo painel remoto (Remote Session Monitor). " +
-        "Trate como se ele tivesse digitado no terminal:\n\n" +
-        corpo,
-    },
+    decision: "block",
+    reason:
+      "Mensagem do usuário, enviada agora pelo painel remoto (Remote Session Monitor). " +
+      "Trate como se ele tivesse digitado no terminal:\n\n" +
+      corpo,
   };
 }
 
