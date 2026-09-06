@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { renderAgentInstaller } from "@/lib/agent-installer";
+import { installerHeaders, renderAgentInstaller } from "@/lib/agent-installer";
 
 /**
  * E2E do comando único, com o executável compilado de verdade.
@@ -25,7 +25,6 @@ import { renderAgentInstaller } from "@/lib/agent-installer";
 
 const tempRoot = resolve("docs/active/SPEC-20260905-2251-instalacao-simples/tmp/windows-e2e");
 const realAgentPath = join(tempRoot, "release", "conect-agent.exe");
-const servedBootstrapPath = join(tempRoot, "served", "install-agent.ps1");
 const isolatedHome = join(tempRoot, "profile");
 const installRoot = join(tempRoot, "Conect Sessions");
 const testRunRoot = "HKCU:\\Software\\ConectSessionsE2E";
@@ -135,7 +134,6 @@ const readRecord = () => JSON.parse(readFileSync(join(installRoot, "agent.pid"),
 beforeAll(async () => {
   rmSync(tempRoot, { recursive: true, force: true });
   mkdirSync(join(realAgentPath, ".."), { recursive: true });
-  mkdirSync(join(servedBootstrapPath, ".."), { recursive: true });
   mkdirSync(isolatedHome, { recursive: true });
 
   const build = Bun.spawn([process.execPath, "run", "scripts/build-agent.mjs"], {
@@ -158,6 +156,13 @@ beforeAll(async () => {
     maxRequestBodySize: 256 * 1024 * 1024,
     async fetch(request) {
       const url = new URL(request.url);
+      // O bootstrap sai pelo MESMO caminho e com os MESMOS headers da produção:
+      // é daqui que o `irm` do comando único vai buscá-lo.
+      if (url.pathname === "/api/public/agent/install.ps1") {
+        return new Response(renderAgentInstaller(server.url.origin), {
+          headers: installerHeaders,
+        });
+      }
       if (url.pathname === "/manifest.json") {
         return Response.json({
           version: manifestVersion,
@@ -214,8 +219,6 @@ beforeAll(async () => {
       return new Response("not found", { status: 404 });
     },
   });
-
-  writeFileSync(servedBootstrapPath, renderAgentInstaller(server.url.origin), "utf8");
 });
 
 afterAll(async () => {
@@ -233,10 +236,16 @@ describe("E2E do comando único com o agente compilado", () => {
   test("um comando conecta o agente, entrega resposta na sessão certa e sobrevive ao logon", async () => {
     const agentPath = join(installRoot, "conect-agent.exe");
 
-    // --- 1. o comando único, exatamente como o painel vai entregá-lo ---------
+    // --- 1. o comando único, exatamente como o painel o entrega ------------
+    //
+    // `irm` + [scriptblock]::Create(), e NÃO um arquivo em disco com `-File`.
+    // A diferença não é cosmética: no modo arquivo o BOM é obrigatório e no modo
+    // string ele é fatal, e era justamente por testar o modo errado que a suíte
+    // ficava verde com a produção quebrando no parse da primeira linha.
+    const bootstrapUrl = new URL("/api/public/agent/install.ps1", server.url).href;
     const install = await runPowerShell(
       [
-        `& '${servedBootstrapPath}'`,
+        `& ([scriptblock]::Create((irm '${bootstrapUrl}')))`,
         `-Code '${pairingCode}'`,
         `-ReleaseManifestUrl '${new URL("manifest.json", server.url).href}'`,
         `-InstallRoot '${installRoot}'`,
