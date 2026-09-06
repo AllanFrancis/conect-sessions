@@ -453,3 +453,25 @@ cinco estados. Mais de 90 testes, dois ciclos de review por task e um passe de n
 - PASS: O plugin do Claude Code é validado, instalável sem edição m…
 - PASS: O painel mostra progresso e diagnóstico acionáveis, suporta…
 - PASS: TypeScript, lint e build de produção passam sem regressão n…
+
+## 2026-09-06 11:37 — [nota] Fechamento: 200 MB de binários no histórico, causa e conserto
+
+Registrado após o arquivamento porque aconteceu durante o próprio fechamento e mudou o que o commit
+de close contém.
+
+gotcha (dashboard): o `.gitignore` cobria `docs/active/**/tmp/`. O `close` MOVE a pasta da SPEC para
+`docs/archive/`, e nesse instante o `tmp/` deixa de casar com a regra — um `git add -A -- docs` no
+fechamento varreu 13 cópias dos executáveis compilados (~200 MB de objetos únicos, 1,2 GB nominal) para
+o histórico, e o push foi aceito com aviso do GitHub. Não era problema desta SPEC: aconteceria em TODO
+fechamento com `tmp/`. A regra virou `docs/**/tmp/`, e o conserto está dentro do commit de close.
+
+Corrigido por reescrita, com autorização do usuário ("Reescrever e force-push (Recomendado)"): o commit
+de fechamento foi refeito sem o `tmp/`, o merge foi refeito a partir do ponto anterior da main, e ambos
+foram para o remoto com `--force-with-lease`. O `.git` caiu de 201 MB para 1,6 MB e não resta blob acima
+de 10 MB em nenhuma ref. Um `tmp/` pequeno de SPEC-20260904-1457 (arquivos de texto, poucos KB) ficou
+onde estava: não vale reescrever histórico por ele.
+
+Detalhe que só aparece depois: o `close` deixa em `docs/active/<spec>/tmp` um diretório VAZIO. O git não
+versiona diretório vazio, então o status fica limpo e a main continua conforme a regra, mas o diretório
+sobra em disco e faz `ls docs/active/` parecer que ainda há SPEC ativa. Removido à mão aqui.
+⎿ commit a701b0d
