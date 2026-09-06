@@ -2,11 +2,11 @@
 
 ## SNAPSHOT (sobrescrever — DEVE caber nas primeiras 60 linhas do arquivo)
 
-**Última atualização:** 2026-09-06 10:25
+**Última atualização:** 2026-09-06 10:47
 **Onde tô:** tasks 1–4 aprovadas e commitadas (1c54434, sem push); falta só a task 5
-**Próximo passo:** task 5 — passe de navegador (móvel e desktop), passe real em Windows com Claude Code, QA e review final
+**Próximo passo:** task 5 — confirmar migration no Supabase remoto, subir o app, passe de navegador, passe real em Windows, QA
 **Última decisão:** `createAgent` removido ("Remover agora"), assumindo que máquina nova fora do Windows fica sem caminho até uma SPEC futura
-**Bloqueio atual:** nenhum
+**Bloqueio atual:** login do painel para o passe de navegador (a rota agents.tsx tem zero cobertura)
 **Se retomar, ler:** main.md, prd.md, techspec.md, 05_task.md, 04_task_review.md e esta SNAPSHOT
 
 ### Fases
@@ -256,3 +256,32 @@ tratar o script instalado como UTF-8, e a garantia de "byte a byte a fonte do re
 Estado do gate: `close --dry` segue com dois bloqueios, ambos da task 5 — critério 5 aguardando evidência
 manual do usuário (instalação real em Windows) e o registro da SPEC em `docs/features/dashboard.md`.
 Nada foi enviado ao remoto.
+
+## 2026-09-06 10:47 — [descoberta] Mapa do que a suíte NÃO prova, levantado a pedido do usuário
+
+Pergunta do usuário: "foi testado o que foi implementado?". Levantamento feito por busca, não de
+memória. Resposta honesta: a lógica sim, a aplicação rodando não — o painel nunca foi aberto num
+navegador em nenhuma sessão desta SPEC.
+
+Provado de verdade: as funções puras de `agent-onboarding.ts` (derivação e precedência de estado,
+conselhos, contador, tradução de erro, nome duplicado, contrato de versão); a camada de banco em PGlite
+com a migration real (RLS, política de DELETE, RPC de consumo devolvendo `installed_at` preenchido e
+`last_seen_at` nulo); a marcação dos componentes por `react-dom/server`; a superfície de exports sem
+`createAgent`. E, da task 2, o `windows-e2e` que executa o binário compilado de ponta a ponta.
+
+Não provado, e é o que importa para a task 5:
+
+1. `src/routes/_authenticated/agents.tsx` tem ZERO cobertura — nenhum teste em `tests/` menciona a rota
+   ou `AgentsPage`. É onde vivem quase todas as mudanças da task 4: `discardPendingCode` (a correção do
+   RF-8), o polling de 3s, o efeito do contador em `usePairingView`, a ligação de `existingNames`, o
+   toast de erro e o `installed_at` acrescentado ao `select`. Nada disso jamais executou.
+2. Nada interativo: SSR não clica nem digita. O ramo visual de nome duplicado nunca renderizou — só a
+   função pura atrás dele está coberta. Copiar, abrir o diálogo e as transições de polling idem.
+3. As asserções de layout são comparação de string: o Tailwind não compila nos testes, então `min-h-11`
+   nunca virou 44px em lugar nenhum.
+4. A consulta ao Supabase nunca rodou. Risco concreto e barato de verificar antes do passe: se a
+   migration `20260906030510_agent_pairing` não estiver aplicada no projeto remoto, a lista de máquinas
+   quebra ao carregar por causa da coluna `installed_at`.
+
+Ordem sugerida para a task 5: confirmar a migration no remoto, subir o app, e só então o passe de
+navegador em viewport móvel e desktop. Aguardando o usuário para o login do painel.
