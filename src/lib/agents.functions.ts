@@ -1,20 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-
-function randomToken() {
-  const bytes = new Uint8Array(24);
-  crypto.getRandomValues(bytes);
-  return Array.from(bytes)
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-}
-
-async function sha256Hex(value: string) {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
-  return Array.from(new Uint8Array(digest))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-}
+import { createAgentToken, randomHex, sha256Hex } from "@/lib/agent-pairing";
 
 /**
  * Cria um agente local (máquina/editor) e devolve o token em texto puro
@@ -28,7 +14,7 @@ export const createAgent = createServerFn({ method: "POST" })
     return { name };
   })
   .handler(async ({ data, context }) => {
-    const token = `lrc_${randomToken()}`;
+    const token = createAgentToken();
     const token_hash = await sha256Hex(token);
 
     const { data: agent, error } = await context.supabase
@@ -44,4 +30,65 @@ export const createAgent = createServerFn({ method: "POST" })
 
     if (error) throw new Error(error.message);
     return { agent, token };
+  });
+
+export const createAgentPairing = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { name: string; targetAgentId?: string | null }) => {
+    const name = String(input?.name ?? "").trim();
+    const targetAgentId = input?.targetAgentId ? String(input.targetAgentId) : null;
+    if (!name || name.length > 80) throw new Error("Nome inválido");
+    if (targetAgentId && !/^[0-9a-f-]{36}$/i.test(targetAgentId)) {
+      throw new Error("Máquina inválida");
+    }
+    return { name, targetAgentId };
+  })
+  .handler(async ({ data, context }) => {
+    const code = randomHex();
+    const codeHash = await sha256Hex(code);
+    const { data: pairings, error } = await context.supabase.rpc("create_agent_pairing", {
+      p_agent_name: data.name,
+      p_code_hash: codeHash,
+      p_target_agent_id: data.targetAgentId,
+    });
+
+    if (error) throw new Error(error.message);
+    const pairing = pairings?.[0];
+    if (!pairing) throw new Error("Falha ao criar pareamento");
+    return { pairingId: pairing.pairing_id, code, expiresAt: pairing.expires_at };
+  });
+
+export const cancelAgentPairing = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { pairingId: string }) => ({
+    pairingId: String(input?.pairingId ?? ""),
+  }))
+  .handler(async ({ data, context }) => {
+    const { error } = await context.supabase
+      .from("agent_pairing_codes")
+      .delete()
+      .eq("id", data.pairingId)
+      .eq("user_id", context.userId)
+      .is("consumed_at", null);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const revokeAgent = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { agentId: string }) => ({
+    agentId: String(input?.agentId ?? ""),
+  }))
+  .handler(async ({ data, context }) => {
+    const now = new Date().toISOString();
+    const { data: agent, error } = await context.supabase
+      .from("agents")
+      .update({ revoked_at: now, updated_at: now })
+      .eq("id", data.agentId)
+      .eq("user_id", context.userId)
+      .select("id")
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!agent) throw new Error("Máquina não encontrada");
+    return { ok: true, revokedAt: now };
   });

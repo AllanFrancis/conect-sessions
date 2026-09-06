@@ -16,33 +16,105 @@ export type Database = {
     Tables: {
       agents: {
         Row: {
+          agent_version: string | null
           created_at: string
           id: string
+          install_error: string | null
+          installed_at: string | null
           last_seen_at: string | null
           name: string
+          platform: string | null
+          plugin_status: string | null
+          revoked_at: string | null
           token_hash: string
           token_prefix: string
+          updated_at: string
           user_id: string
         }
         Insert: {
+          agent_version?: string | null
           created_at?: string
           id?: string
+          install_error?: string | null
+          installed_at?: string | null
           last_seen_at?: string | null
           name: string
+          platform?: string | null
+          plugin_status?: string | null
+          revoked_at?: string | null
           token_hash: string
           token_prefix: string
+          updated_at?: string
           user_id: string
         }
         Update: {
+          agent_version?: string | null
           created_at?: string
           id?: string
+          install_error?: string | null
+          installed_at?: string | null
           last_seen_at?: string | null
           name?: string
+          platform?: string | null
+          plugin_status?: string | null
+          revoked_at?: string | null
           token_hash?: string
           token_prefix?: string
+          updated_at?: string
           user_id?: string
         }
         Relationships: []
+      }
+      agent_pairing_codes: {
+        Row: {
+          agent_id: string | null
+          agent_name: string
+          code_hash: string
+          consumed_at: string | null
+          created_at: string
+          expires_at: string
+          id: string
+          target_agent_id: string | null
+          user_id: string
+        }
+        Insert: {
+          agent_id?: string | null
+          agent_name: string
+          code_hash: string
+          consumed_at?: string | null
+          created_at?: string
+          expires_at: string
+          id?: string
+          target_agent_id?: string | null
+          user_id: string
+        }
+        Update: {
+          agent_id?: string | null
+          agent_name?: string
+          code_hash?: string
+          consumed_at?: string | null
+          created_at?: string
+          expires_at?: string
+          id?: string
+          target_agent_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_pairing_codes_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_pairing_codes_target_agent_id_fkey"
+            columns: ["target_agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       messages: {
         Row: {
@@ -196,7 +268,31 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      create_agent_pairing: {
+        Args: {
+          p_agent_name: string
+          p_code_hash: string
+          p_target_agent_id?: string | null
+        }
+        Returns: {
+          expires_at: string
+          pairing_id: string
+        }[]
+      }
+      consume_agent_pairing: {
+        Args: {
+          p_code_hash: string
+          p_platform?: string
+          p_token_hash: string
+          p_token_prefix: string
+          p_version?: string
+        }
+        Returns: {
+          agent_id: string
+          pairing_id: string
+          repaired: boolean
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never

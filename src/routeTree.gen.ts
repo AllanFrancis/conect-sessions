@@ -15,6 +15,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedAgentsRouteImport } from './routes/_authenticated/agents'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedSessionsSessionIdRouteImport } from './routes/_authenticated/sessions.$sessionId'
+import { Route as ApiPublicAgentPairRouteImport } from './routes/api/public/agent/pair'
 import { Route as ApiPublicAgentRemoteAgentRouteImport } from './routes/api/public/agent/remote-agent'
 import { Route as ApiPublicAgentSyncRouteImport } from './routes/api/public/agent/sync'
 
@@ -48,6 +49,11 @@ const AuthenticatedSessionsSessionIdRoute =
     path: '/sessions/$sessionId',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const ApiPublicAgentPairRoute = ApiPublicAgentPairRouteImport.update({
+  id: '/api/public/agent/pair',
+  path: '/api/public/agent/pair',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicAgentRemoteAgentRoute =
   ApiPublicAgentRemoteAgentRouteImport.update({
     id: '/api/public/agent/remote-agent',
@@ -66,6 +72,7 @@ export interface FileRoutesByFullPath {
   '/agents': typeof AuthenticatedAgentsRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/sessions/$sessionId': typeof AuthenticatedSessionsSessionIdRoute
+  '/api/public/agent/pair': typeof ApiPublicAgentPairRoute
   '/api/public/agent/remote-agent': typeof ApiPublicAgentRemoteAgentRoute
   '/api/public/agent/sync': typeof ApiPublicAgentSyncRoute
 }
@@ -75,6 +82,7 @@ export interface FileRoutesByTo {
   '/agents': typeof AuthenticatedAgentsRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/sessions/$sessionId': typeof AuthenticatedSessionsSessionIdRoute
+  '/api/public/agent/pair': typeof ApiPublicAgentPairRoute
   '/api/public/agent/remote-agent': typeof ApiPublicAgentRemoteAgentRoute
   '/api/public/agent/sync': typeof ApiPublicAgentSyncRoute
 }
@@ -86,6 +94,7 @@ export interface FileRoutesById {
   '/_authenticated/agents': typeof AuthenticatedAgentsRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/sessions/$sessionId': typeof AuthenticatedSessionsSessionIdRoute
+  '/api/public/agent/pair': typeof ApiPublicAgentPairRoute
   '/api/public/agent/remote-agent': typeof ApiPublicAgentRemoteAgentRoute
   '/api/public/agent/sync': typeof ApiPublicAgentSyncRoute
 }
@@ -97,6 +106,7 @@ export interface FileRouteTypes {
     | '/agents'
     | '/dashboard'
     | '/sessions/$sessionId'
+    | '/api/public/agent/pair'
     | '/api/public/agent/remote-agent'
     | '/api/public/agent/sync'
   fileRoutesByTo: FileRoutesByTo
@@ -106,6 +116,7 @@ export interface FileRouteTypes {
     | '/agents'
     | '/dashboard'
     | '/sessions/$sessionId'
+    | '/api/public/agent/pair'
     | '/api/public/agent/remote-agent'
     | '/api/public/agent/sync'
   id:
@@ -116,6 +127,7 @@ export interface FileRouteTypes {
     | '/_authenticated/agents'
     | '/_authenticated/dashboard'
     | '/_authenticated/sessions/$sessionId'
+    | '/api/public/agent/pair'
     | '/api/public/agent/remote-agent'
     | '/api/public/agent/sync'
   fileRoutesById: FileRoutesById
@@ -124,6 +136,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
+  ApiPublicAgentPairRoute: typeof ApiPublicAgentPairRoute
   ApiPublicAgentRemoteAgentRoute: typeof ApiPublicAgentRemoteAgentRoute
   ApiPublicAgentSyncRoute: typeof ApiPublicAgentSyncRoute
 }
@@ -172,6 +185,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSessionsSessionIdRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/api/public/agent/pair': {
+      id: '/api/public/agent/pair'
+      path: '/api/public/agent/pair'
+      fullPath: '/api/public/agent/pair'
+      preLoaderRoute: typeof ApiPublicAgentPairRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/agent/remote-agent': {
       id: '/api/public/agent/remote-agent'
       path: '/api/public/agent/remote-agent'
@@ -208,6 +228,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
+  ApiPublicAgentPairRoute: ApiPublicAgentPairRoute,
   ApiPublicAgentRemoteAgentRoute: ApiPublicAgentRemoteAgentRoute,
   ApiPublicAgentSyncRoute: ApiPublicAgentSyncRoute,
 }
