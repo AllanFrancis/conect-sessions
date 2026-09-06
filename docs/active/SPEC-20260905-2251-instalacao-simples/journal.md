@@ -22,8 +22,7 @@
 <!-- anti-alucinação por estrutura: separe o que é SABIDO (verificado no código/teste) do que é CHUTE (inferido) do que está EM ABERTO. Nunca trate inferência como fato. -->
 - fato: `HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run` inicia por usuário sem instalação em nível de máquina.
 - fato: o binário responde `--version` (0.1.0) e `--probe --json`, contrato do diagnóstico do instalador.
-- fato: o `Progress` do shadcn descartava `value` antes do Radix (barra `indeterminate`, sem `aria-valuenow`); corrigido, vale para todo uso.
-- fato: `renderToStaticMarkup` testa componente real sem runner de DOM, mas o Radix não monta diálogo no SSR — alvo de toque do diálogo só no navegador.
+- fato: `renderToStaticMarkup` testa componente real sem runner de DOM, mas não abre diálogo do Radix nem aplica CSS — geometria só no navegador (foi assim que o nome truncado escapou).
 - fato: `/api/public/agent/pair` só aceita `windows-x64`; sem `createAgent`, máquina nova fora do Windows não tem caminho. Inferência: binário sem assinatura deve alertar o SmartScreen.
 - dúvida: nenhuma dúvida de arquitetura bloqueante.
 
@@ -50,13 +49,14 @@
 
 ### Onde parei
 
-Tasks 1 a 4 aprovadas. A task 4 trocou a tela de token pela jornada guiada: estado "aguardando
-instalação" (RF-10) vindo de `installed_at` sem heartbeat, conselho acionável em texto por estado,
-cancelamento do código pendente ao trocar de pareamento (RF-8), reconexão de revogada sem perder identidade,
-`/reload-plugins` e desinstalação copiável (RF-11). Duas reviews: mudanças, depois aprovado.
-Pendente: task 5 — passe de navegador, passe real em Windows (evidência do usuário), QA e review final.
+Tasks 1–4 aprovadas e commitadas. Task 5 em curso: a migration de pareamento foi aplicada no remoto
+(estava faltando, e por isso todo `/sync` respondia 401 em produção) e o passe de navegador rodou em
+390px e 1280px, com evidência em `evidence/task5-*.png`. Dois defeitos de layout achados e corrigidos.
+Pendente: passe real em Windows (critério 5, evidência do usuário) e registrar em features/dashboard.md.
 
 ### Sessões (máx 5 linhas + 1 agregada)
+
+- 2026-09-06 08:28→11:10: task 4 (2 reviews) + migration em produção + passe de navegador. 4 commits.
 
 ## LOG (append-only — NUNCA editar entradas antigas)
 <!-- tipos: ativação descoberta decisão tentativa blocker unblock refactor nota conclusão | entrada nova: specctl log -->
@@ -341,3 +341,17 @@ visual do cartão corrigido foi feita injetando o markup real do componente numa
 carregada, medindo com o CSS compilado — não pela rota autenticada.
 
 Gates: 92 testes em 15 arquivos, typecheck, lint com 0 erros, build e diff-check.
+
+## 2026-09-06 11:10 — [nota] Fechamento de sessão
+
+Sem mudança de código depois de 08f785a: o achado do passe, as correções de layout e a aplicação da
+migration em produção já estão na entrada das 11:05, commitados junto com o código. Esta entrada existe
+para fechar o gate R.6.1 e marcar a fronteira da sessão na SNAPSHOT.
+
+Estado para quem retomar: `close --dry` segue com os mesmos dois bloqueios, ambos dependentes de gente —
+o critério 5 espera o passe real em Windows com evidência do usuário, e falta registrar a SPEC em
+`docs/features/dashboard.md`. `.codex/` continua não rastreado, aguardando decisão do usuário. Três
+achados do passe ficaram sem correção de propósito, com justificativa na entrada das 11:05: o alvo de
+toque do `termLinkClass` (compartilhado por todas as telas), o contador que compara relógio do cliente
+com `expires_at` do servidor, e um redirecionamento para `/auth` visto uma vez em modo dev, não
+reproduzido de forma limpa.
