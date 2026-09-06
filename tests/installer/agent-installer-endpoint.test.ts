@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import { installerHeaders, renderAgentInstaller } from "@/lib/agent-installer";
 import { Route } from "@/routes/api/public/agent/install[.]ps1";
 
@@ -35,9 +36,66 @@ describe("bootstrap servido em /api/public/agent/install.ps1", () => {
     const rendered = renderAgentInstaller("https://painel.exemplo.com");
     expect(rendered).toContain("$ApiUrl = 'https://painel.exemplo.com'");
     expect(rendered).not.toContain("__CONNECT_");
-    // BOM: sem ele o PowerShell 5.1 lê o script salvo em disco como ANSI e as
-    // mensagens em português chegam ilegíveis ao usuário.
-    expect(rendered.charCodeAt(0)).toBe(0xfeff);
+  });
+
+  test("não começa com BOM — o bootstrap é string, não arquivo", () => {
+    const rendered = renderAgentInstaller("https://painel.exemplo.com");
+    // Esta asserção já existiu invertida, exigindo o BOM, e foi ela que deixou a
+    // produção quebrar com 41 testes verdes. O comando do painel faz `irm` e
+    // entrega o texto a [scriptblock]::Create(): ali o U+FEFF é o primeiro
+    // CARACTERE da string, o parser não reconhece o `<#` da linha 1 e lê o
+    // cabeçalho de comentário como código.
+    expect(rendered.charCodeAt(0)).not.toBe(0xfeff);
+    expect(rendered.startsWith("<#")).toBe(true);
+  });
+
+  /*
+   * O caminho REAL de execução, que nenhum teste exercitava.
+   *
+   * As suítes gravavam o bootstrap em arquivo e rodavam com `-File`, modo em que
+   * o BOM é obrigatório e tudo passava — 41 testes verdes com a produção
+   * quebrada. O comando do painel não faz isso: faz `irm` e passa o texto a
+   * `[scriptblock]::Create()`. Aqui o texto é decodificado como o `irm`
+   * decodifica (UTF8.GetString NÃO remove o U+FEFF) e entregue ao mesmo parser.
+   */
+  test("o parser aceita o bootstrap servido, como faria o comando do painel", () => {
+    const dir = mkdtempSync(join(tmpdir(), "bootstrap-parse-"));
+    try {
+      const alvo = join(dir, "served.ps1");
+      writeFileSync(alvo, renderAgentInstaller("https://painel.exemplo.com"), "utf8");
+      const sonda = join(dir, "sonda.ps1");
+      writeFileSync(
+        sonda,
+        [
+          `$bytes = [IO.File]::ReadAllBytes('${alvo.replace(/\\/g, "\\\\")}')`,
+          "$texto = [Text.Encoding]::UTF8.GetString($bytes)",
+          "try { [scriptblock]::Create($texto) | Out-Null; 'PARSE_OK' }",
+          "catch { 'PARSE_FALHOU: ' + $_.Exception.Message }",
+        ].join("\n"),
+        "utf8",
+      );
+      const child = Bun.spawnSync([
+        "powershell.exe",
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        sonda,
+      ]);
+      const saida = new TextDecoder().decode(child.stdout).trim();
+      expect(saida).toBe("PARSE_OK");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("o que vai para o DISCO continua com BOM", () => {
+    const rendered = renderAgentInstaller("https://painel.exemplo.com");
+    // O bootstrap grava estes três em disco e o PowerShell 5.1 os abre por
+    // caminho — sem BOM, cada acento das mensagens chega quebrado ao usuário.
+    for (const nome of ["EmbeddedLauncher", "EmbeddedUninstaller", "EmbeddedProcessLib"] as const) {
+      expect(embeddedSource(rendered, nome).charCodeAt(0)).toBe(0xfeff);
+    }
   });
 
   test("normaliza origem com porta e barra final", () => {

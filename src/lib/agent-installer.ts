@@ -20,15 +20,25 @@ function toBase64(value: string) {
 }
 
 /**
- * O BOM não é decoração: o PowerShell 5.1, que é o que existe por padrão no
- * Windows 10 e 11, lê um `.ps1` sem BOM usando a página de código ANSI. Sem ele
- * cada acento das mensagens chega quebrado ao usuário. Os arquivos versionados
- * têm BOM, mas o carregador `?raw` do bun o remove na importação (o do Vite
- * pode preservar), então a garantia é reposta aqui em vez de depender do
- * empacotador.
+ * BOM sim para o que vai ao DISCO, nunca para o que vai como STRING.
+ *
+ * O PowerShell 5.1 — o que existe por padrão no Windows 10 e 11 — lê um `.ps1`
+ * sem BOM usando a página de código ANSI, e cada acento das mensagens chega
+ * quebrado ao usuário. Por isso launcher, desinstalador e biblioteca de processo
+ * são embutidos COM BOM: o bootstrap grava os três em disco e o PowerShell os
+ * abre por caminho. O carregador `?raw` do bun remove o BOM na importação, então
+ * a garantia é reposta aqui em vez de depender do empacotador.
+ *
+ * O bootstrap é o caso oposto, e foi onde isto quebrou em produção. Ele nunca
+ * toca o disco: o comando do painel faz `irm` e entrega o TEXTO a
+ * `[scriptblock]::Create()`. Ali o U+FEFF vira o primeiro caractere da string, o
+ * parser deixa de reconhecer o `<#` da linha 1 e passa a ler o cabeçalho de
+ * comentário como código — o erro que chegou ao usuário foi "Missing closing ')'"
+ * apontando para um parêntese que estava DENTRO do comentário.
  */
 const BOM = "\uFEFF";
 const withBom = (source: string) => (source.startsWith(BOM) ? source : BOM + source);
+const withoutBom = (source: string) => (source.startsWith(BOM) ? source.slice(1) : source);
 
 const embedded: Record<string, string> = {
   __CONNECT_PROCESS_LIB_B64__: toBase64(withBom(processLibSource)),
@@ -37,7 +47,7 @@ const embedded: Record<string, string> = {
 };
 
 export function renderAgentInstaller(origin: string) {
-  let rendered = withBom(installerSource).replaceAll(
+  let rendered = withoutBom(installerSource).replaceAll(
     "__CONNECT_API_URL__",
     origin.trim().replace(/\/+$/, ""),
   );
