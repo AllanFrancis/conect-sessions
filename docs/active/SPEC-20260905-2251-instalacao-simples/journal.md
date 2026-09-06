@@ -2,11 +2,11 @@
 
 ## SNAPSHOT (sobrescrever — DEVE caber nas primeiras 60 linhas do arquivo)
 
-**Última atualização:** 2026-09-06 10:47
-**Onde tô:** tasks 1–4 aprovadas e commitadas (1c54434, sem push); falta só a task 5
-**Próximo passo:** task 5 — confirmar migration no Supabase remoto, subir o app, passe de navegador, passe real em Windows, QA
-**Última decisão:** `createAgent` removido ("Remover agora"), assumindo que máquina nova fora do Windows fica sem caminho até uma SPEC futura
-**Bloqueio atual:** login do painel para o passe de navegador (a rota agents.tsx tem zero cobertura)
+**Última atualização:** 2026-09-06 11:05
+**Onde tô:** task 5 em curso — migration aplicada no remoto e passe de navegador feito em 390/1280px
+**Próximo passo:** passe real em Windows (critério 5, evidência do usuário) e registrar a SPEC em docs/features/dashboard.md
+**Última decisão:** histórico de migrations reconciliado por `repair` e a de pareamento aplicada em produção
+**Bloqueio atual:** sessão do navegador expirou (login é OAuth Google); e o passe real em Windows depende do usuário
 **Se retomar, ler:** main.md, prd.md, techspec.md, 05_task.md, 04_task_review.md e esta SNAPSHOT
 
 ### Fases
@@ -285,3 +285,59 @@ Não provado, e é o que importa para a task 5:
 
 Ordem sugerida para a task 5: confirmar a migration no remoto, subir o app, e só então o passe de
 navegador em viewport móvel e desktop. Aguardando o usuário para o login do painel.
+
+## 2026-09-06 11:05 — [descoberta] Migration não estava no remoto; passe de navegador parcial
+
+O usuário mandou executar ("faça então"). A primeira verificação achou o problema maior desta SPEC até
+agora: `20260906030510_agent_pairing` NUNCA foi aplicada no Supabase remoto. Nem a tabela
+`agent_pairing_codes`, nem `consume_agent_pairing`, nem nenhuma das seis colunas novas de `agents`.
+
+Provado, não inferido: a consulta exata do `/sync` (`select id,user_id,revoked_at`) devolvia HTTP 400
+`42703` no esquema de então, e a mesma sem `revoked_at` devolvia 200 — testado com o `token_hash` do
+agente real. Como `requireAgentAccess` trata `data` nulo como token inválido, todo sync respondia 401.
+O usuário confirmou que a produção está no ar com o código de 4fb7ac9 ou posterior, então o produto
+estava quebrado para qualquer agente desde o deploy. Não dá para dizer por quanto tempo: o único agente
+calou às 04:30Z, mas nenhum processo do agente roda nesta máquina, então a silência se explica igualmente
+por ele estar desligado. Não confundir a coincidência com prova.
+
+gotcha (dashboard): havia divergência de histórico de migrations — o remoto tinha `20260905205407` sem
+arquivo local, e o local tinha `20260905205500_sessao_unica_por_usuario` sem registro no remoto, a 53
+segundos de distância. O `db push` se recusa a rodar nesse estado. A equivalência não foi chutada: o
+journal de SPEC-20260904-2135 diz "Migração aplicada em produção" com medição pós-migração (48→36
+sessões), e o dado atual tem 0 pares (user_id, external_id) duplicados em 39 sessões. Com isso,
+`migration repair --status reverted 20260905205407` + `--status applied 20260905205500` reconciliou o
+histórico sem tocar no esquema, e o push aplicou só a de pareamento.
+
+Pós-aplicação, verificado por HTTP: a consulta do `/sync` volta 200, o `select` do painel devolve as seis
+colunas, `agent_pairing_codes` existe, `consume_agent_pairing` responde `PAIRING_NOT_FOUND` para código
+inválido (a guarda transacional funciona) e `anon` leva 401 na tabela de pareamento.
+
+Passe de navegador em 390px e 1280px, contra a produção, com evidência em `evidence/task5-*.png`. O que
+os testes de SSR não alcançavam e agora está medido: os dois botões do diálogo de revogação medem 44px
+exatos; a página não rola de lado em 390px (scrollWidth == clientWidth == 390); o `Progress` emite
+`aria-valuenow="67"` com `data-state="loading"`; os passos anunciam "(concluído)"/"(pendente)" na árvore
+de acessibilidade; nome duplicado marca o campo `[invalid]` com alerta próprio, sem diferenciar caixa; e
+a jornada de pareamento roda ponta a ponta — código real gerado, contador correndo, e o cancelamento
+apagou a linha do banco sem deixar agente órfão.
+
+Dois defeitos de layout que SÓ o navegador revelou, ambos corrigidos e remedidos:
+o nome da máquina truncava em "Windows do Al…" (o identificador do cartão virava o único texto ilegível
+da tela) — `truncate` virou `wrap-anywhere`, e a largura disponível foi de ~180px para 272px; e o badge
+de estado disputava a linha com o nome, agora desce para a própria linha no celular e volta ao canto no
+desktop. A contagem "1 no total" partia em duas linhas sobre o subtítulo; ganhou `shrink-0` e
+`whitespace-nowrap`.
+
+Achados NÃO corrigidos, para decisão:
+- o link "← Sessões" mede 30px de altura, único alvo abaixo de 44px na página. Vem do `termLinkClass`
+  compartilhado em `terminal.tsx`, então mexer afeta todas as telas — não é defeito desta task.
+- o contador do código usa o relógio do cliente contra um `expires_at` do servidor: mostrou "10:13" para
+  uma validade de 10 minutos, ou seja ~13s de desvio. Inofensivo aqui, mas um cliente com relógio errado
+  veria expiração imediata ou tempo demais.
+- uma carga de `/agents` logo após rebuild do Vite caiu para `/auth` com erro de hidratação na página de
+  login. Visto em modo dev, com a sessão já expirando; não reproduzido de forma limpa.
+
+Bloqueio: a sessão do navegador expirou no meio do passe, e o login é OAuth do Google. A revalidação
+visual do cartão corrigido foi feita injetando o markup real do componente numa página do app já
+carregada, medindo com o CSS compilado — não pela rota autenticada.
+
+Gates: 92 testes em 15 arquivos, typecheck, lint com 0 erros, build e diff-check.

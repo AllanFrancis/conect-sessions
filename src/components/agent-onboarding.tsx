@@ -369,13 +369,25 @@ export function MachineCard({
           <Monitor className="size-5 text-primary" aria-hidden="true" />
         </span>
         <div className="min-w-0 flex-1">
-          <h3 className="truncate text-base text-foreground">{machine.name}</h3>
+          {/*
+            O nome quebra, não corta. Medido em 390px: com `truncate`, o cartão
+            mostrava "Windows do Al…" — o identificador da máquina virava o único
+            texto ilegível da tela, justo o que o usuário usa para saber em qual
+            delas está mexendo.
+          */}
+          <h3 className="text-base wrap-anywhere text-foreground">{machine.name}</h3>
           <p className="mt-1 text-xs text-muted-foreground">
             {machine.platform || "Windows"} · versão {machine.agent_version || "não informada"} ·{" "}
             {formatLastSeen(machine.last_seen_at)}
           </p>
         </div>
-        <MachineStatusBadge machine={machine} />
+        {/*
+          No celular o badge desce para a própria linha em vez de disputar a
+          largura com o nome; no desktop, onde sobra espaço, volta para o canto.
+        */}
+        <div className="w-full sm:w-auto">
+          <MachineStatusBadge machine={machine} />
+        </div>
       </div>
       {/*
         O conselho herda a severidade do badge. Antes ele era vermelho para tudo

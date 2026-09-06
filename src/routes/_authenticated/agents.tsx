@@ -210,7 +210,12 @@ function AgentsPage() {
               Estado, versão e última conexão em um só lugar.
             </p>
           </div>
-          <span className="text-xs text-muted-foreground">
+          {/*
+            `shrink-0` e sem quebra: em 390px o subtítulo empurrava a contagem
+            até ela partir em "1 no" / "total", empilhado em cima do texto ao
+            lado. Agora o subtítulo é quem quebra, e a contagem fica inteira.
+          */}
+          <span className="shrink-0 whitespace-nowrap text-xs text-muted-foreground">
             {agentsQuery.data?.length ?? 0} no total
           </span>
         </div>

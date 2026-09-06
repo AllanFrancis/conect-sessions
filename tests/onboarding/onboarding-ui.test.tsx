@@ -278,7 +278,10 @@ describe("layout de celular e alvo de toque", () => {
     const bloco = html.slice(html.indexOf("<pre"), html.indexOf("</pre>"));
     expect(bloco).toContain("overflow-x-auto");
     expect(bloco).toContain("break-all");
-    expect(card()).toContain("truncate");
+    // O nome da máquina QUEBRA, não corta: com `truncate` o passe em 390px
+    // mostrou "Windows do Al…", ilegível justo no identificador do cartão.
+    expect(card({ name: "Windows do Allan" })).toContain("wrap-anywhere");
+    expect(card({ name: "Windows do Allan" })).not.toContain("truncate");
   });
 
   test("as fileiras que competem por largura quebram em vez de estourar", () => {
