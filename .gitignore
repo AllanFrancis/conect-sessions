@@ -30,7 +30,10 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
-docs/active/**/tmp/
+# Descartáveis da SPEC. `docs/**` e não `docs/active/**`: o `close` MOVE a pasta
+# para docs/archive/, e ali o tmp/ deixava de casar com a regra — um `git add`
+# no fechamento varria os executáveis compilados (200 MB) para o histórico.
+docs/**/tmp/
 .scratch/
 
 # Supabase CLI: cache de link (contem refs, nao versionar)

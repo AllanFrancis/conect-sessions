@@ -1,13 +1,13 @@
 # SPEC-20260905-2251: instalação simples
 
-**Status:** active
+**Status:** done
 **Porte:** G
 **Owner:** @allan
 **Criada:** 2026-09-05 22:51
 **Ativada:** 2026-09-05 22:51
-**Concluída:** —
+**Concluída:** 2026-09-06 11:29
 **Pausada em:** —
-**Commit final:** —
+**Commit final:** `0f391fd`
 **Keywords:** instalação, pareamento, Windows, Claude Code, plugin, onboarding
 **Features:** dashboard
 **Branch:** codex/instalacao-simples
@@ -75,9 +75,9 @@ Alternativas rejeitadas: editar `~/.claude/settings.json` continua frágil e mis
 
 ## Critério de aceite
 
-- [ ] O painel gera para uma máquina um pareamento de uso único, expira códigos antigos e nunca retorna a credencial permanente ao navegador (cobre RF-1, RF-2, RF-3, RF-8) | verify: `bun run test:installer`
-- [ ] O comando único instala ou repara idempotentemente o agente no escopo do usuário, preserva a credencial fora do histórico e configura início automático no Windows 10/11 (cobre RF-4, RF-5, RF-9) | verify: `bun run test:installer`
-- [ ] O plugin do Claude Code é validado, instalável sem edição manual de `settings.json`, usa caminho relativo ao próprio plugin e falha sem bloquear a sessão (cobre RF-6, RF-7) | verify: `bun run test:plugin`
-- [ ] O painel mostra progresso e diagnóstico acionáveis, suporta várias máquinas e permite copiar reparo, revogar e orientar desinstalação com controles acessíveis (cobre RF-1, RF-8, RF-10, RF-11) | verify: `bun run test:onboarding`
-- [ ] Uma instalação real em Windows conecta o agente reiniciado automaticamente e entrega uma resposta à sessão correta do Claude Code em até três minutos, sem editar JSON | evidence: manual @allan
-- [ ] TypeScript, lint e build de produção passam sem regressão no fluxo atual de Kiro e sincronização dos agentes existentes (cobre RF-12) | verify: `bunx tsc --noEmit && bun run lint && bun run build`
+- [x] O painel gera para uma máquina um pareamento de uso único, expira códigos antigos e nunca retorna a credencial permanente ao navegador (cobre RF-1, RF-2, RF-3, RF-8) (2026-09-06 11:28, commit `0f391fd`, verify: exit 0) | verify: `bun run test:installer`
+- [x] O comando único instala ou repara idempotentemente o agente no escopo do usuário, preserva a credencial fora do histórico e configura início automático no Windows 10/11 (cobre RF-4, RF-5, RF-9) (2026-09-06 11:28, commit `0f391fd`, verify: exit 0) | verify: `bun run test:installer`
+- [x] O plugin do Claude Code é validado, instalável sem edição manual de `settings.json`, usa caminho relativo ao próprio plugin e falha sem bloquear a sessão (cobre RF-6, RF-7) (2026-09-06 11:29, commit `0f391fd`, verify: exit 0) | verify: `bun run test:plugin`
+- [x] O painel mostra progresso e diagnóstico acionáveis, suporta várias máquinas e permite copiar reparo, revogar e orientar desinstalação com controles acessíveis (cobre RF-1, RF-8, RF-10, RF-11) (2026-09-06 11:29, commit `0f391fd`, verify: exit 0) | verify: `bun run test:onboarding`
+- [ ] Uma instalação real em Windows conecta o agente reiniciado automaticamente e entrega uma resposta à sessão correta do Claude Code em até três minutos, sem editar JSON | evidence: manual @allan [aceito-incompleto: "Transferir para a SPEC-20260906-1122 (Recomendado)" 2026-09-06 11:26]
+- [x] TypeScript, lint e build de produção passam sem regressão no fluxo atual de Kiro e sincronização dos agentes existentes (cobre RF-12) (2026-09-06 11:29, commit `0f391fd`, verify: exit 0) | verify: `bunx tsc --noEmit && bun run lint && bun run build`

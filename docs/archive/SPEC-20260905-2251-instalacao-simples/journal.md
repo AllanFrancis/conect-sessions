@@ -2,11 +2,11 @@
 
 ## SNAPSHOT (sobrescrever — DEVE caber nas primeiras 60 linhas do arquivo)
 
-**Última atualização:** 2026-09-06 11:23
-**Onde tô:** task 5 parada no critério 5; branch publicada; distribuição virou SPEC-20260906-1122 (future)
-**Próximo passo:** executar SPEC-20260906-1122 (repo público de release) e só então o passe real em Windows
-**Última decisão:** "Espero o passe real" (não fecha hoje) + "Repositório público só para releases"
-**Bloqueio atual:** critério 5 depende de SPEC-20260906-1122; sem ela não há download anônimo de binário
+**Última atualização:** 2026-09-06 11:29
+**Onde tô:** fechando — critério 5 transferido para SPEC-20260906-1122, R.7 registrado, gate pronto: SIM
+**Próximo passo:** merge na main e, depois, executar SPEC-20260906-1122 para viabilizar o passe real
+**Última decisão:** "Transferir para a SPEC-20260906-1122 (Recomendado)" — critério 5 sai daqui
+**Bloqueio atual:** nenhum para fechar; o passe real em Windows vive agora na SPEC-20260906-1122
 **Se retomar, ler:** main.md, prd.md, techspec.md, 05_task.md, 04_task_review.md e esta SNAPSHOT
 
 ### Fases
@@ -418,3 +418,38 @@ depende de uma máquina sem credencial de GitHub conseguir baixar manifesto e ex
 exatamente o que a SPEC nova entrega. Registrado para que ninguém tente o passe antes disso e conclua que
 o instalador está quebrado — ele não está; a distribuição é que não existe ainda.
 ⎿ commit ab4f44e
+
+## 2026-09-06 11:27 — [decisão] Critério 5 transferido para SPEC-20260906-1122; SPEC fecha
+
+O usuário mudou a decisão de 11:23 e mandou fechar. Perguntei item a item conforme R.6.2, porque
+"faça o fechamento" não é aceite de um critério específico, e a escolha foi, literalmente:
+"Transferir para a SPEC-20260906-1122 (Recomendado)".
+
+Critério 5 — instalação real em Windows conectando o agente reiniciado e entregando resposta na sessão
+correta em até três minutos — recebeu o marcador `[aceito-incompleto]` com essa citação. O marcador é a
+única forma de arquivar com `[ ]` (formats.md linha 61), e é o registro honesto: a prova NÃO existe nesta
+SPEC. Ela não sumiu, mudou de dono — SPEC-20260906-1122 já nasceu com o critério equivalente, e mais
+exigente, porque exige a instalação numa máquina SEM credencial de GitHub.
+
+A transferência é coerente com a causa: o passe é impossível hoje porque o instalador e o
+`claude plugin marketplace add` baixam sem credencial de um repositório privado. Quem remove esse
+bloqueio é justamente a SPEC nova. Fechar aqui e provar lá evita uma SPEC parada por meses esperando algo
+que outra SPEC precisa entregar primeiro.
+
+R.7 cumprido: `docs/features/dashboard.md` recebeu a linha desta SPEC em "### Concluídas" e a
+SPEC-20260906-1122 em "### Planejadas", com o motivo pelo qual ela existe.
+
+O que esta SPEC de fato entregou e provou: pareamento de uso único com consumo atômico, bootstrap e
+agente autossuficiente para Windows com identidade de processo por caminho e horário, plugin do Claude
+Code instalável pela CLI oficial, pipeline de release, e a jornada guiada de máquinas no painel com os
+cinco estados. Mais de 90 testes, dois ciclos de review por task e um passe de navegador em 390px e
+1280px. O que ela NÃO provou está neste marcador e no critério da SPEC seguinte.
+⎿ commit 0f391fd+dirty · 2 files changed, 3 insertions(+), 1 deletion(-)
+
+## 2026-09-06 11:29 — [nota] verify: 5/5 critérios passaram (commit `0f391fd`)
+
+- PASS: O painel gera para uma máquina um pareamento de uso único, …
+- PASS: O comando único instala ou repara idempotentemente o agente…
+- PASS: O plugin do Claude Code é validado, instalável sem edição m…
+- PASS: O painel mostra progresso e diagnóstico acionáveis, suporta…
+- PASS: TypeScript, lint e build de produção passam sem regressão n…
