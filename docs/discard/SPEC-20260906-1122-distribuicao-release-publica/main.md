@@ -1,6 +1,6 @@
 # SPEC-20260906-1122: distribuicao release publica
 
-**Status:** draft
+**Status:** discarded
 **Porte:** M
 **Owner:** @allan
 **Criada:** 2026-09-06 11:22
@@ -92,3 +92,7 @@ Anthropic** — está fora de escopo desde a SPEC anterior.
 - [ ] O instalador e o comando de marketplace apontam para o repositório público | verify: `bun run test:installer && bun run test:plugin`
 - [ ] Agente, hook, plugin e a constante do painel declaram a mesma versão, inclusive no que é publicado | verify: `bun run test:onboarding`
 - [ ] Uma instalação real em Windows sem credencial de GitHub conecta o agente e entrega uma resposta | evidence: manual @allan
+
+## Justificativa de descarte
+
+Premissa caiu: o usuário tornou AllanFrancis/conect-sessions público em 2026-09-06, então o download anônimo e o marketplace do plugin funcionam pelo repositório atual e a techspec original volta a valer sem mudança. (2026-09-06 12:11)
