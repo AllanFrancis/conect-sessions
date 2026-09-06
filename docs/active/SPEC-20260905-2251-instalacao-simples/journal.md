@@ -2,8 +2,8 @@
 
 ## SNAPSHOT (sobrescrever — DEVE caber nas primeiras 60 linhas do arquivo)
 
-**Última atualização:** 2026-09-06 10:20
-**Onde tô:** tasks 1 a 4 aprovadas; falta só a task 5 (QA, passe real no Windows, review final e fechamento)
+**Última atualização:** 2026-09-06 10:25
+**Onde tô:** tasks 1–4 aprovadas e commitadas (1c54434, sem push); falta só a task 5
 **Próximo passo:** task 5 — passe de navegador (móvel e desktop), passe real em Windows com Claude Code, QA e review final
 **Última decisão:** `createAgent` removido ("Remover agora"), assumindo que máquina nova fora do Windows fica sem caminho até uma SPEC futura
 **Bloqueio atual:** nenhum
@@ -226,3 +226,33 @@ Decisão do usuário (2026-09-06), citação literal: "Remover agora (Recomendad
 Decisão do usuário (2026-09-06), citação literal: "Passe no navegador na task 5 (QA)" — o item "Testes E2E móvel e desktop" da task 4 foi transferido para a subtarefa 5.1, com o escopo listado lá: geometria em 360px, diálogo de revogação aberto, `aria-live` em transição real e ordem de foco pelo teclado.
 
 Gates: 92 testes em 15 arquivos (36 só de onboarding, o `verify:` do quarto critério de aceite), typecheck, lint com 0 erros, build de produção e `git diff --check` aprovados.
+
+## 2026-09-06 10:25 — [conclusão] Tasks 2, 3 e 4 commitadas em 1c54434
+
+Commit único para as três tasks aprovadas, a pedido do usuário ("sim"). Uma tentativa de separar por
+task foi descartada: `package.json` acumula os scripts das três (`build:agent:windows`,
+`build:agent:release`, `test:installer|plugin|onboarding`) e dividi-lo faria commits que referenciam
+suítes ainda inexistentes — história bonita e nenhum commit verde sozinho. Gates antes de commitar:
+92 testes em 15 arquivos, typecheck, lint com 0 erros.
+
+Duas decisões sobre o que NÃO entrou, ambas revisáveis pelo usuário:
+
+`.codex/` (config.toml, hooks.json, agents/task-reviewer.toml) ficou fora. É configuração de ferramenta,
+já presente antes desta sessão, e não código do produto — incluí-la num commit de SPEC seria decidir pelo
+usuário se aquilo é versionado.
+
+`Microsoft/Windows/PowerShell/ModuleAnalysisCache` foi apagado e entrou no `.gitignore`.
+
+gotcha (dashboard): `tests/installer/windows-e2e.test.ts` redireciona o perfil do Windows e o PowerShell
+grava seu ModuleAnalysisCache em `Microsoft/` NA RAIZ do repositório a cada execução — o cache segue
+`$env:LOCALAPPDATA`, que o teste deixa apontando para o diretório de trabalho. O `.gitignore` impede que
+suje o versionamento, mas a causa continua de pé e contraria a regra de temporários (tmp/ ou evidence/,
+nunca a raiz). Não toquei no teste porque é código aprovado da task 2; fica como candidato da task 5.
+
+Verificado antes do commit que o BOM dos quatro `.ps1` sobrevive ao index (`efbbbf` em disco e em
+`git show :arquivo`), apesar do `* text=auto eol=lf` do `.gitattributes` — é ele que faz o PowerShell 5.1
+tratar o script instalado como UTF-8, e a garantia de "byte a byte a fonte do repositório" depende disso.
+
+Estado do gate: `close --dry` segue com dois bloqueios, ambos da task 5 — critério 5 aguardando evidência
+manual do usuário (instalação real em Windows) e o registro da SPEC em `docs/features/dashboard.md`.
+Nada foi enviado ao remoto.
