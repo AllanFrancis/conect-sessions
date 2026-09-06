@@ -22,6 +22,10 @@ Provar a jornada de ponta a ponta numa máquina Windows real, validar regressõe
 ## Subtarefas
 
 - [ ] 5.1 Executar E2E completo no painel e instalação isolada
+  - Inclui o passe de navegador da task 4 (viewport móvel E desktop: criar pareamento, copiar
+    comando, polling até conectado, expiração, reparo e confirmação de revogação), transferido
+    para cá por decisão do usuário em 2026-09-06: "Passe no navegador na task 5 (QA)".
+    A task 4 entregou unidade, integração PGlite e render SSR; o navegador falta e é aqui.
 - [ ] 5.2 Executar passe real Windows + Claude Code e preservar evidências
 - [ ] 5.3 Executar QA, corrigir bugs e repetir testes
 - [ ] 5.4 Executar review final, gates da SPEC e preparar fechamento

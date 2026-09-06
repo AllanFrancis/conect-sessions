@@ -21,10 +21,10 @@ Substituir a tela técnica de tokens pela jornada guiada de adicionar, acompanha
 
 ## Subtarefas
 
-- [ ] 4.1 Projetar estados e componentes responsivos da jornada
-- [ ] 4.2 Implementar criação/polling, cópia de comando e progresso anunciado
-- [ ] 4.3 Implementar reparo, expiração, revogação e instruções de desinstalação
-- [ ] 4.4 Criar e executar testes de estado, acessibilidade e viewports
+- [x] 4.1 Projetar estados e componentes responsivos da jornada
+- [x] 4.2 Implementar criação/polling, cópia de comando e progresso anunciado
+- [x] 4.3 Implementar reparo, expiração, revogação e instruções de desinstalação
+- [x] 4.4 Criar e executar testes de estado, acessibilidade e viewports
 
 ## Detalhes de Implementação
 
@@ -38,9 +38,13 @@ Seguir `techspec.md` e a Experiência do Usuário do PRD; reutilizar componentes
 
 ## Testes da Tarefa
 
-- [ ] Testes de unidade
-- [ ] Testes de integração
-- [ ] Testes E2E móvel e desktop
+- [x] Testes de unidade
+- [x] Testes de integração
+- [ ] Testes E2E móvel e desktop — TRANSFERIDO para a task 5 (subtarefa 5.1) por decisão
+      do usuário em 2026-09-06: "Passe no navegador na task 5 (QA)". Esta task entregou
+      unidade, integração em PGlite e render SSR real dos componentes; o que o SSR não
+      alcança (geometria em 360px, diálogo de revogação aberto, aria-live numa transição
+      real e ordem de foco) é o passe de navegador lá.
 
 <critical>SEMPRE CRIE E EXECUTE OS TESTES DA TAREFA ANTES DE CONSIDERÁ-LA FINALIZADA</critical>
 

@@ -48,3 +48,7 @@ skills-lock.json
 
 # saída do Playwright MCP (snapshots/console de teste manual)
 .playwright-mcp/
+
+# Cache que o PowerShell escreve na raiz quando um teste redireciona o perfil
+# do Windows (tests/installer/windows-e2e). Lixo de execução, não do projeto.
+Microsoft/

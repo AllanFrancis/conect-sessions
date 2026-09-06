@@ -1,36 +1,19 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { createAgentToken, randomHex, sha256Hex } from "@/lib/agent-pairing";
+import { randomHex, sha256Hex } from "@/lib/agent-pairing";
 
-/**
- * Cria um agente local (máquina/editor) e devolve o token em texto puro
- * UMA única vez — no banco fica apenas o hash.
+/*
+ * Não existe mais um `createAgent` que devolva o token permanente ao navegador.
+ *
+ * Ele era o fluxo antigo — "copie este token agora" — e o RF-3 proíbe exibir a
+ * credencial permanente ao navegador. Quem cria máquina agora é
+ * `consume_agent_pairing`, chamado pelo instalador com um código de uso único:
+ * o token nasce no servidor e vai direto para a máquina, sem passar pela aba.
+ *
+ * Consequência assumida com o usuário em 2026-09-06: adicionar uma máquina NOVA
+ * fora do Windows ficou sem caminho, porque `/api/public/agent/pair` só aceita
+ * `platform: windows-x64`. Agentes já existentes continuam sincronizando.
  */
-export const createAgent = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((data: { name: string }) => {
-    const name = String(data?.name ?? "").trim();
-    if (!name || name.length > 80) throw new Error("Nome inválido");
-    return { name };
-  })
-  .handler(async ({ data, context }) => {
-    const token = createAgentToken();
-    const token_hash = await sha256Hex(token);
-
-    const { data: agent, error } = await context.supabase
-      .from("agents")
-      .insert({
-        user_id: context.userId,
-        name: data.name,
-        token_hash,
-        token_prefix: token.slice(0, 12),
-      })
-      .select("id, name, created_at")
-      .single();
-
-    if (error) throw new Error(error.message);
-    return { agent, token };
-  });
 
 export const createAgentPairing = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

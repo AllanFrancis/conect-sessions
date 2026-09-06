@@ -12,6 +12,10 @@ const Progress = React.forwardRef<
   <ProgressPrimitive.Root
     ref={ref}
     className={cn("relative h-2 w-full overflow-hidden rounded-full bg-primary/20", className)}
+    // Sem repassar o value, o Radix marca a barra como `indeterminate` e não
+    // emite `aria-valuenow`: visualmente ela anda, e o leitor de tela anuncia
+    // uma barra sem progresso nenhum.
+    value={value}
     {...props}
   >
     <ProgressPrimitive.Indicator

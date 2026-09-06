@@ -15,6 +15,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedAgentsRouteImport } from './routes/_authenticated/agents'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedSessionsSessionIdRouteImport } from './routes/_authenticated/sessions.$sessionId'
+import { Route as ApiPublicAgentInstallDotps1RouteImport } from './routes/api/public/agent/install[.]ps1'
 import { Route as ApiPublicAgentPairRouteImport } from './routes/api/public/agent/pair'
 import { Route as ApiPublicAgentRemoteAgentRouteImport } from './routes/api/public/agent/remote-agent'
 import { Route as ApiPublicAgentSyncRouteImport } from './routes/api/public/agent/sync'
@@ -49,6 +50,12 @@ const AuthenticatedSessionsSessionIdRoute =
     path: '/sessions/$sessionId',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const ApiPublicAgentInstallDotps1Route =
+  ApiPublicAgentInstallDotps1RouteImport.update({
+    id: '/api/public/agent/install.ps1',
+    path: '/api/public/agent/install.ps1',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicAgentPairRoute = ApiPublicAgentPairRouteImport.update({
   id: '/api/public/agent/pair',
   path: '/api/public/agent/pair',
@@ -72,6 +79,7 @@ export interface FileRoutesByFullPath {
   '/agents': typeof AuthenticatedAgentsRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/sessions/$sessionId': typeof AuthenticatedSessionsSessionIdRoute
+  '/api/public/agent/install.ps1': typeof ApiPublicAgentInstallDotps1Route
   '/api/public/agent/pair': typeof ApiPublicAgentPairRoute
   '/api/public/agent/remote-agent': typeof ApiPublicAgentRemoteAgentRoute
   '/api/public/agent/sync': typeof ApiPublicAgentSyncRoute
@@ -82,6 +90,7 @@ export interface FileRoutesByTo {
   '/agents': typeof AuthenticatedAgentsRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/sessions/$sessionId': typeof AuthenticatedSessionsSessionIdRoute
+  '/api/public/agent/install.ps1': typeof ApiPublicAgentInstallDotps1Route
   '/api/public/agent/pair': typeof ApiPublicAgentPairRoute
   '/api/public/agent/remote-agent': typeof ApiPublicAgentRemoteAgentRoute
   '/api/public/agent/sync': typeof ApiPublicAgentSyncRoute
@@ -94,6 +103,7 @@ export interface FileRoutesById {
   '/_authenticated/agents': typeof AuthenticatedAgentsRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/sessions/$sessionId': typeof AuthenticatedSessionsSessionIdRoute
+  '/api/public/agent/install.ps1': typeof ApiPublicAgentInstallDotps1Route
   '/api/public/agent/pair': typeof ApiPublicAgentPairRoute
   '/api/public/agent/remote-agent': typeof ApiPublicAgentRemoteAgentRoute
   '/api/public/agent/sync': typeof ApiPublicAgentSyncRoute
@@ -106,6 +116,7 @@ export interface FileRouteTypes {
     | '/agents'
     | '/dashboard'
     | '/sessions/$sessionId'
+    | '/api/public/agent/install.ps1'
     | '/api/public/agent/pair'
     | '/api/public/agent/remote-agent'
     | '/api/public/agent/sync'
@@ -116,6 +127,7 @@ export interface FileRouteTypes {
     | '/agents'
     | '/dashboard'
     | '/sessions/$sessionId'
+    | '/api/public/agent/install.ps1'
     | '/api/public/agent/pair'
     | '/api/public/agent/remote-agent'
     | '/api/public/agent/sync'
@@ -127,6 +139,7 @@ export interface FileRouteTypes {
     | '/_authenticated/agents'
     | '/_authenticated/dashboard'
     | '/_authenticated/sessions/$sessionId'
+    | '/api/public/agent/install.ps1'
     | '/api/public/agent/pair'
     | '/api/public/agent/remote-agent'
     | '/api/public/agent/sync'
@@ -136,6 +149,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
+  ApiPublicAgentInstallDotps1Route: typeof ApiPublicAgentInstallDotps1Route
   ApiPublicAgentPairRoute: typeof ApiPublicAgentPairRoute
   ApiPublicAgentRemoteAgentRoute: typeof ApiPublicAgentRemoteAgentRoute
   ApiPublicAgentSyncRoute: typeof ApiPublicAgentSyncRoute
@@ -185,6 +199,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSessionsSessionIdRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/api/public/agent/install.ps1': {
+      id: '/api/public/agent/install.ps1'
+      path: '/api/public/agent/install.ps1'
+      fullPath: '/api/public/agent/install.ps1'
+      preLoaderRoute: typeof ApiPublicAgentInstallDotps1RouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/agent/pair': {
       id: '/api/public/agent/pair'
       path: '/api/public/agent/pair'
@@ -228,6 +249,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
+  ApiPublicAgentInstallDotps1Route: ApiPublicAgentInstallDotps1Route,
   ApiPublicAgentPairRoute: ApiPublicAgentPairRoute,
   ApiPublicAgentRemoteAgentRoute: ApiPublicAgentRemoteAgentRoute,
   ApiPublicAgentSyncRoute: ApiPublicAgentSyncRoute,

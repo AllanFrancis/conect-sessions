@@ -39,6 +39,12 @@ import { exec, execFileSync } from "node:child_process";
 const ARGV = process.argv.slice(2);
 const PROBE = ARGV.includes("--probe");
 const PROBE_JSON = ARGV.includes("--json");
+const SHOW_VERSION = ARGV.includes("--version");
+
+const AGENT_VERSION = process.env.LRC_AGENT_VERSION || "0.1.0";
+const AGENT_PLATFORM = process.env.LRC_AGENT_PLATFORM || "windows-x64";
+const PLUGIN_STATUS = process.env.LRC_PLUGIN_STATUS || "unknown";
+const INSTALL_ERROR = process.env.LRC_INSTALL_ERROR || null;
 
 const URL_BASE = (process.env.LRC_URL || "").replace(/\/$/, "");
 const TOKEN = process.env.LRC_TOKEN || "";
@@ -49,7 +55,7 @@ const PROC_TTL = Number(process.env.LRC_PROC_TTL || 4000);
 const MONITOR_ON = process.env.LRC_MONITOR !== "0";
 const SYNC_CONCURRENCY = Math.max(1, Number(process.env.LRC_CONCURRENCY || 4));
 
-if (!PROBE && (!URL_BASE || !TOKEN)) {
+if (!PROBE && !SHOW_VERSION && (!URL_BASE || !TOKEN)) {
   console.error("Defina LRC_URL e LRC_TOKEN (ou rode com --probe para só diagnosticar).");
   process.exit(1);
 }
@@ -1436,7 +1442,17 @@ async function postSync(session, messages) {
       const res = await fetch(`${URL_BASE}/api/public/agent/sync`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ token: TOKEN, session, messages }),
+        body: JSON.stringify({
+          token: TOKEN,
+          agent: {
+            version: AGENT_VERSION,
+            platform: AGENT_PLATFORM,
+            plugin_status: PLUGIN_STATUS,
+            install_error: INSTALL_ERROR,
+          },
+          session,
+          messages,
+        }),
       });
       if (res.ok) return res.json();
 
@@ -1695,7 +1711,9 @@ function probe() {
 // entrada
 // ---------------------------------------------------------------------------
 
-if (PROBE) {
+if (SHOW_VERSION) {
+  console.log(AGENT_VERSION);
+} else if (PROBE) {
   probe();
 } else {
   console.log(`Perfil do usuário: ${HOME}`);

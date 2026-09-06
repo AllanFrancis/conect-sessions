@@ -1,52 +1,11 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { PGlite } from "@electric-sql/pglite";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { closePairingDatabases, createPairingDatabase } from "../support/pairing-db";
 
-const migration = readFileSync(
-  resolve("supabase/migrations/20260906030510_agent_pairing.sql"),
-  "utf8",
-);
+// O bootstrap do banco vive em tests/support porque os testes de onboarding
+// dependem das mesmas garantias; duas cópias divergiriam da migration caladas.
+const database = createPairingDatabase;
 
-const databases: PGlite[] = [];
-
-async function database() {
-  const db = new PGlite();
-  databases.push(db);
-  await db.exec(`
-    create role anon nologin;
-    create role authenticated nologin;
-    create role service_role nologin bypassrls;
-    create schema auth;
-    create table auth.users (id uuid primary key);
-    create function auth.uid() returns uuid language sql stable as $$
-      select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid
-    $$;
-    grant usage on schema auth to anon, authenticated, service_role;
-    grant execute on function auth.uid() to anon, authenticated, service_role;
-    create table public.agents (
-      id uuid primary key default gen_random_uuid(),
-      user_id uuid not null,
-      name text not null,
-      token_hash text not null unique,
-      token_prefix text not null,
-      last_seen_at timestamptz,
-      created_at timestamptz not null default now()
-    );
-    grant select, insert, update, delete on public.agents to authenticated;
-    grant all on public.agents to service_role;
-    alter table public.agents enable row level security;
-    create policy "own agents" on public.agents for all to authenticated
-      using ((select auth.uid()) = user_id)
-      with check ((select auth.uid()) = user_id);
-  `);
-  await db.exec(migration);
-  return db;
-}
-
-afterEach(async () => {
-  await Promise.all(databases.splice(0).map((db) => db.close()));
-});
+afterEach(closePairingDatabases);
 
 describe("agent pairing database", () => {
   test("anon has no table privilege even before RLS is considered", async () => {

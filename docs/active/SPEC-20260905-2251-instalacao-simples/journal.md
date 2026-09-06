@@ -2,12 +2,12 @@
 
 ## SNAPSHOT (sobrescrever — DEVE caber nas primeiras 60 linhas do arquivo)
 
-**Última atualização:** 2026-09-05 23:31
-**Onde tô:** bypass de TTL da segunda review corrigido; aguardando terceira review da task 1
-**Próximo passo:** obter aprovação da task 1 e iniciar bootstrap/agente Windows da task 2
-**Última decisão:** cliente autenticado não insere pareamento nem escolhe validade; a RPC define dez minutos internamente
+**Última atualização:** 2026-09-06 10:20
+**Onde tô:** tasks 1 a 4 aprovadas; falta só a task 5 (QA, passe real no Windows, review final e fechamento)
+**Próximo passo:** task 5 — passe de navegador (móvel e desktop), passe real em Windows com Claude Code, QA e review final
+**Última decisão:** `createAgent` removido ("Remover agora"), assumindo que máquina nova fora do Windows fica sem caminho até uma SPEC futura
 **Bloqueio atual:** nenhum
-**Se retomar, ler:** main.md, prd.md, techspec.md e esta SNAPSHOT
+**Se retomar, ler:** main.md, prd.md, techspec.md, 05_task.md, 04_task_review.md e esta SNAPSHOT
 
 ### Fases
 | # | Descrição | Status | Atualizado |
@@ -15,42 +15,46 @@
 | 1 | PRD e contrato | concluído | 2026-09-05 22:56 |
 | 2 | TechSpec e pesquisa | concluído | 2026-09-05 23:03 |
 | 3 | Tasks | concluído | 2026-09-05 23:05 |
-| 4 | Implementação | em progresso (task 1/5) | 2026-09-05 23:05 |
-| 5 | QA, review e fechamento | pendente | 2026-09-05 22:56 |
+| 4 | Implementação | concluído (tasks 1–4 aprovadas em review) | 2026-09-06 10:20 |
+| 5 | QA, review e fechamento | em progresso (task 5 é a próxima) | 2026-09-06 10:20 |
 
 ### Fatos confirmados / Inferências prováveis / Dúvidas em aberto
 <!-- anti-alucinação por estrutura: separe o que é SABIDO (verificado no código/teste) do que é CHUTE (inferido) do que está EM ABERTO. Nunca trate inferência como fato. -->
-- fato: o agente atual já autentica com token permanente armazenado apenas como SHA-256 em `agents.token_hash`.
-- fato: o Claude Code suporta hooks empacotados em plugin e recarga via `/reload-plugins`.
-- fato: o Supabase deixará de expor novas tabelas do Data API automaticamente; grants explícitos são necessários.
-- fato: Bun 1.4 suporta executável Windows x64 baseline autossuficiente e opção de ocultar console.
 - fato: `HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run` inicia por usuário sem instalação em nível de máquina.
-- inferência: binário sem assinatura poderá gerar alerta do SmartScreen; precisa comunicação explícita no onboarding.
+- fato: o binário responde `--version` (0.1.0) e `--probe --json`, contrato do diagnóstico do instalador.
+- fato: o `Progress` do shadcn descartava `value` antes do Radix (barra `indeterminate`, sem `aria-valuenow`); corrigido, vale para todo uso.
+- fato: `renderToStaticMarkup` testa componente real sem runner de DOM, mas o Radix não monta diálogo no SSR — alvo de toque do diálogo só no navegador.
+- fato: `/api/public/agent/pair` só aceita `windows-x64`; sem `createAgent`, máquina nova fora do Windows não tem caminho. Inferência: binário sem assinatura deve alertar o SmartScreen.
 - dúvida: nenhuma dúvida de arquitetura bloqueante.
 
 ### Respostas-chave do usuário
 
-- “Faça isso então! da forma que planejou” — autorizou a implementação do plugin e onboarding de um comando.
-- “confirmado” — confirmou dashboard, porte G, @allan, pipeline completo autônomo.
-- “sim” — confirmou Windows 10/11 + Claude Code, múltiplas máquinas, diagnóstico/reparo/remoção; Kiro inalterado e macOS/Linux fora.
-- “sim pode” — autorizou `.exe` autossuficiente compilado/publicado por GitHub Actions e sem assinatura comercial nesta SPEC.
+- “Faça isso então! da forma que planejou” — autorizou plugin e onboarding de um comando.
+- “sim” — Windows 10/11 + Claude Code, múltiplas máquinas, diagnóstico/reparo/remoção; Kiro inalterado, macOS/Linux fora.
+- “sim pode” — `.exe` autossuficiente publicado por GitHub Actions, sem assinatura comercial nesta SPEC.
+- “Passe no navegador na task 5 (QA)” — E2E de navegador da task 4 transferido para a subtarefa 5.1.
+- “Remover agora (Recomendado)” — `createAgent` removido, aceitando que máquina nova fora do Windows fica sem caminho.
 
 ### Tentativas que falharam
 
-- Primeira criação da branch falhou porque `.git` exige permissão elevada; repetida com autorização e concluída.
-- `specctl new` recebeu `@allan` sem aspas no PowerShell e gravou owner incorreto; `main.md` corrigido e fato preservado no LOG.
+- Nada em aberto; as falhas das tasks 1–4 estão resolvidas e registradas no LOG.
 
 ### Arquivos tocados
 
-- docs/active/SPEC-20260905-2251-instalacao-simples/main.md
-- docs/active/SPEC-20260905-2251-instalacao-simples/prd.md
-- docs/active/SPEC-20260905-2251-instalacao-simples/techspec.md
-- docs/active/SPEC-20260905-2251-instalacao-simples/tasks.md e 01_task.md..05_task.md
-- docs/active/SPEC-20260905-2251-instalacao-simples/journal.md
+- docs/active/SPEC-20260905-2251-instalacao-simples/: main.md, prd.md, techspec.md, tasks.md, 01..05_task.md, 01..04_task_review.md, journal.md
+- public/agent/: install-agent.ps1, launcher.ps1, uninstall-agent.ps1, agent-process.ps1, remote-agent.mjs
+- src/lib/: agent-installer, agent-onboarding, agent-pairing*, agents.functions · src/routes/api/public/agent/* · supabase/migrations/*
+- src/components/agent-onboarding.tsx, src/components/ui/progress.tsx, src/routes/_authenticated/agents.tsx
+- tests/installer/*, tests/onboarding/* (agent-onboarding, onboarding-ui, pairing-lifecycle, version-contract, credential-surface), tests/support/pairing-db.ts
+- scripts/build-agent.mjs, package.json
 
 ### Onde parei
 
-Task 1 com 22 testes verdes, typecheck e lint aprovados; terceira review pendente.
+Tasks 1 a 4 aprovadas. A task 4 trocou a tela de token pela jornada guiada: estado "aguardando
+instalação" (RF-10) vindo de `installed_at` sem heartbeat, conselho acionável em texto por estado,
+cancelamento do código pendente ao trocar de pareamento (RF-8), reconexão de revogada sem perder identidade,
+`/reload-plugins` e desinstalação copiável (RF-11). Duas reviews: mudanças, depois aprovado.
+Pendente: task 5 — passe de navegador, passe real em Windows (evidência do usuário), QA e review final.
 
 ### Sessões (máx 5 linhas + 1 agregada)
 
@@ -100,3 +104,125 @@ A assinatura de `create_agent_pairing` não recebe mais expiração: a própria 
 
 Terceira revisão da Task 1.0 aprovada. O bypass de TTL foi fechado: `create_agent_pairing` não recebe prazo do cliente e deriva dez minutos no banco; `authenticated` perdeu `INSERT` direto; a função `SECURITY DEFINER` mantém `search_path` vazio, valida `auth.uid()` e ownership; a tabela limita `expires_at` a `created_at + 10 minutes`. Testes confirmam negação da inserção direta mesmo com `created_at` futuro e TTL exato de 600 segundos. Todos os achados anteriores permanecem resolvidos. Gates: 22 testes, typecheck, lint e diff-check aprovados; apenas seis warnings preexistentes fora do escopo.
 ⎿ commit 69881ca+dirty · 6 files changed, 216 insertions(+), 104 deletions(-)
+
+## 2026-09-05 23:38 — [nota] Task 2 pronta para review
+
+O agente passou a enviar versão/plataforma/estado do plugin e ganhou `--version`; o bootstrap público troca o código, baixa manifesto e executável, valida SHA-256 antes de substituir, protege o token com DPAPI CurrentUser, escreve launcher com logs rotativos e registra um único valor em HKCU Run. Reexecução para reparo foi testada em pasta isolada, sem token/código em config, launcher ou log; hash incorreto preserva o binário conhecido. O endpoint `/api/public/agent/install.ps1` injeta a origem da requisição. Executável Bun `windows-x64-baseline` compilado e executado com `--version` e `--probe --json`. Gates: 27 testes, typecheck, lint, build web e diff-check aprovados; teste DPAPI exige perfil Windows real e passou fora do sandbox.
+
+## 2026-09-06 00:32 — [refactor] Achados da review da Task 2 corrigidos
+
+Ordem do bootstrap invertida: manifesto, download em staging, SHA-256 e `--version` do candidato acontecem ANTES da troca do código de pareamento. Causa-raiz do achado crítico: consumir o código gira a credencial no servidor, então qualquer falha posterior de rede ou integridade deixava a máquina com token já invalidado — reparo destruindo instalação saudável. Depois da troca, a credencial protegida é gravada de imediato e só então o agente antigo é parado e os arquivos trocados.
+
+Identidade de processo virou biblioteca única (`public/agent/agent-process.ps1`), consumida pelo instalador, pelo launcher e pelo desinstalador. PID cru nunca mais é alvo de Stop-Process: o par (caminho do executável, horário de criação) decide, e o que não confere é registro stale. `agent.pid` passou de número para JSON com pid/path/start, com aceitação do formato antigo por igualdade de caminho. O launcher ganhou mutex local por instalação, porque a checagem de processo vivo sozinha não impede dois arranques simultâneos. O instalador encerra com varredura por caminho, para o caso de registro perdido com agente ainda segurando o .exe.
+
+Diagnóstico deixou de ser presumido: `--version` valida o artefato antes do swap, o instalador espera o processo aparecer com identidade conferida e `--probe --json` precisa devolver JSON válido; qualquer etapa falha com mensagem acionável. Launcher e desinstalador passaram a ser arquivos versionados embutidos em base64 pelo endpoint, então o que é instalado é byte a byte a fonte do repositório — fim das duas implementações do desinstalador. `build:agent:windows` virou `scripts/build-agent.mjs` com destino configurável (AGENT_OUTFILE/--outfile, padrão dist/agent), desacoplado da pasta da SPEC.
+
+gotcha (dashboard): PowerShell 5.1 lê `.ps1` sem BOM usando a página de código ANSI, e todo acento das mensagens chega quebrado ao usuário. Os quatro scripts passaram a ter BOM e o renderizador o repõe, porque o carregador `?raw` do bun o remove na importação. TextDecoder também remove BOM por padrão: usar `ignoreBOM: true` quando o BOM é conteúdo.
+
+gotcha (dashboard): processo iniciado por `Start-Process` herda os handles do pai, então um neto vivo mantém o pipe do Bun aberto e `new Response(child.stdout).text()` nunca chega a EOF. Nos testes o PowerShell roda com stdout ignorado e todos os fluxos redirecionados para arquivo (UTF-16LE), com try/catch no wrapper para capturar a mensagem do erro terminante, que o host escreve fora do escopo do redirecionamento.
+
+Cobertura: agente falso agora é executável real compilado por `Add-Type -OutputAssembly`, chave Run isolada por `-RunKeyPath` e testes exercitando launcher duas vezes, PID reciclado por processo alheio, reparo com agente em execução, remoção idempotente, bootstrap servido sozinho e headers/renderização do endpoint. Gates: 40 testes de installer, typecheck, lint, build web, build do agente e `git diff --check` aprovados; binário compilado responde `--version` e `--probe --json`. Falta a validação manual em Windows real (critério com evidência do usuário) e a re-review da task 2.
+⎿ commit 4fb7ac9+dirty · 4 files changed, 54 insertions(+), 9 deletions(-)
+
+## 2026-09-06 00:49 — [conclusão] E2E do comando único com o binário compilado
+
+Fechado o único item que a review deixou fora do alcance automático: `tests/installer/windows-e2e.test.ts` roda o produto, não o instalador. Compila o agente com `scripts/build-agent.mjs`, serve o bootstrap renderizado pelo endpoint, instala com um comando em raiz, chave Run e USERPROFILE isolados, e prova o caminho completo da credencial — protegida pelo instalador, descriptografada pelo launcher, usada pelo agente no `/sync` com a telemetria de versão vinda do manifesto. Uma sessão de Claude Code semeada como o hook a deixaria recebe do servidor uma resposta endereçada por `external_id`, e o teste confirma a entrega em `state/inbox/claude-<id>.jsonl`. O valor gravado em Run é executado literalmente para simular o logon, e a remoção não deixa processo, pasta nem valor.
+
+gotcha (dashboard): aninhar `powershell.exe` dentro de outro PowerShell trava quando o neto sobrevive — a chamada de comando nativo espera EOF dos fluxos do filho, e o agente herda esses handles. O logon real não tem shell intermediário: o teste cria o processo direto da linha de comando gravada em Run, que também é a simulação fiel.
+
+gotcha (dashboard): com USERPROFILE apontado para perfil descartável, o agente não enxerga as sessões reais da máquina (os testes ficam rápidos e determinísticos) e o DPAPI continua funcionando, porque a chave-mestra é carregada por APPDATA, que fica intacto.
+
+Gates: 41 testes de installer (8 arquivos), typecheck, lint e build do agente aprovados; E2E completo em ~6s. Segue manual no critério de aceite 5: download do release real do GitHub e round-trip dentro do Claude Code, que depende do plugin da task 3.
+⎿ commit 4fb7ac9+dirty · 5 files changed, 86 insertions(+), 22 deletions(-)
+
+## 2026-09-06 08:36 — [conclusão] Task 2 aprovada na re-review
+
+A re-review integral da Task 2.0 confirmou a resolução dos sete achados anteriores: validação do artefato antes do pareamento; identidade de processo por caminho e horário de início; diagnóstico pós-instalação; cobertura comportamental de processo, HKCU Run e remoção; endpoint renderizado e headers; build com destino configurável; e fonte única para launcher, desinstalador e biblioteca de processo.
+
+Gates: 41 testes de installer em 8 arquivos aprovados no perfil real do Windows, incluindo E2E com binário compilado, DPAPI, sync, resposta endereçada, execução literal do valor de Run e remoção sem rastro. Typecheck, lint, build web, build do agente Windows x64 baseline e git diff --check passaram. O sandbox isolado não carrega o perfil DPAPI CurrentUser e, por isso, falhou em 8 testes dependentes de DPAPI; a repetição no contexto real passou. Veredito: APROVADO, sem achados críticos, major ou minor.
+⎿ commit 4fb7ac9+dirty · 5 files changed, 97 insertions(+), 22 deletions(-)
+
+## 2026-09-06 08:52 — [descoberta] Review da Task 3 solicita mudanças
+
+A review da Task 3.0 encontrou um bloqueante funcional: o launcher inicia o agente com `LRC_STATE_DIR=<InstallRoot>/state`, mas o wrapper do plugin não define essa variável para `conect-hook.exe`; o hook cai no fallback `~/.lrc`. Em produção, agente e hook leem/escrevem sessions e inbox em árvores diferentes, impedindo o round-trip do plugin. O teste de runtime injeta `LRC_STATE_DIR` diretamente e não executa o wrapper, mascarando a integração quebrada.
+
+Achados major: o wrapper chama `StandardOutput.ReadToEnd()` antes de `WaitForExit(125000)`, portanto um filho travado impede o timeout interno de ser alcançado; stderr redirecionado também não é drenado. Não existe passe local do fluxo marketplace → instalação/listagem → wrapper, as suítes de installer usam `-SkipPlugin`, e os checklists da Task 3 continuam pendentes. A pipeline de binários consumidos automaticamente usa tags móveis de GitHub Actions sob `contents: write`, inclusive ação de release de terceiro, sem pin por SHA.
+
+Gates verdes não anulam os achados: plugin 9/9, installer 41/41 no perfil real, manifests do plugin e marketplace validados pela CLI oficial, dois binários baseline em 0.1.0, typecheck, lint, build web e diff-check aprovados. Veredito: MUDANÇAS SOLICITADAS.
+⎿ commit 4fb7ac9+dirty · 7 files changed, 129 insertions(+), 45 deletions(-)
+
+## 2026-09-06 09:06 — [descoberta] Segunda review da Task 3 ainda solicita mudanças
+
+A segunda review confirmou as correções de estado compartilhado via `LRC_STATE_DIR` + `--state-dir`, drenagem assíncrona de stdout/stderr antes do timeout, integração real wrapper PowerShell + hook compilado, Actions pinadas por SHA e isolamento de `contents: write` no job de release. O teste de processo travado com 5 MiB em stderr passa.
+
+Novo [CRITICAL]: em `workflow_dispatch`, o input de tag é obrigatório e validado, mas `actions/checkout` não usa `RELEASE_TAG` como ref. O build compila o ref escolhido na interface enquanto manifesto e `gh release create --verify-tag` publicam sob a tag informada, permitindo release cujos bytes não correspondem ao commit tagueado.
+
+Permanece [MAJOR] a ausência de passe marketplace add/install/list pelo Claude Code em configuração isolada; o teste novo cobre wrapper + executável, não instalação/carregamento pelo mecanismo oficial, e os checklists da Task 3 seguem abertos. [MINOR]: após timeout, falha suprimida de `Kill()` é seguida por `WaitForExit()` sem limite.
+
+Gates: plugin 11/11, validação oficial, build dos dois executáveis baseline e versões 0.1.0, typecheck, lint e diff-check aprovados; installer 41/41 preservado do ciclo anterior. Veredito: MUDANÇAS SOLICITADAS.
+⎿ commit 4fb7ac9+dirty · 7 files changed, 144 insertions(+), 47 deletions(-)
+
+## 2026-09-06 09:09 — [conclusão] Task 3 aprovada na terceira review
+
+A terceira revisão da Task 3.0 aprovou a entrega sem achados críticos, major ou minor. Foram confirmadas as correções de todos os remanescentes: `actions/checkout` usa `RELEASE_TAG` como ref; o passe real da CLI em `CLAUDE_CONFIG_DIR` isolado executou marketplace add, install em escopo user e list JSON, confirmando plugin habilitado na versão 0.1.0; a espera posterior a `Kill()` está limitada pelo timeout nomeado de 5000 ms; e o teste de contrato cobre ref, permissões e rejeição de tags móveis de Actions.
+
+Os cinco achados originais permanecem resolvidos: estado compartilhado via env e `--state-dir`, drenagem assíncrona de stdout/stderr, integração real PowerShell + hook compilado, Actions pinadas com escrita isolada no job de release e despacho manual com tag obrigatória, validada e construída do mesmo ref publicado.
+
+Gates: plugin 11/11, validação oficial do plugin, passe isolado de instalação/listagem, builds e versões dos dois executáveis baseline, typecheck, lint e git diff --check aprovados; installer 41/41 preservado do ciclo da task. Veredito: APROVADO.
+⎿ commit 4fb7ac9+dirty · 7 files changed, 155 insertions(+), 47 deletions(-)
+
+## 2026-09-06 10:05 — [descoberta] Review da Task 4 solicita mudanças
+
+A jornada guiada substitui de fato a tela de tokens: a superfície de token cru saiu inteira da UI, os cinco estados derivam do que o banco prova, cada estado fora de "conectada" traz motivo e ação em texto, e a cobertura é comportamental — render SSR real com `react-dom/server` e RPC real em PGlite, não grep de fonte. O `Progress` teve um bug pré-existente do shadcn corrigido: `value` nunca chegava ao Radix, deixando a barra `indeterminate` sem `aria-valuenow`.
+
+[MAJOR] `createAgent` em `src/lib/agents.functions.ts:9` ficou órfão mas continua registrado como server function no bundle de produção (`createAgent_createServerFn_handler` em `.output/server/_ssr/agents.functions-*.mjs`), devolvendo token permanente em texto puro a qualquer sessão autenticada. Esta task removeu o último chamador legítimo sem remover a função — contraria a invariante "NUNCA expor a credencial permanente do agente" e o RF-3.
+
+[MAJOR] O rastreador de passos (`Step`, `agent-onboarding.tsx:86-103`) comunica conclusão apenas por cor: círculo e ícone são `aria-hidden`, sobrando só `text-foreground` vs `text-muted-foreground`. Em leitor de tela, `waiting` e `connected` produzem a mesma lista. Contraria o critério "estados compreensíveis sem depender de cor" e a WCAG 1.4.1.
+
+[MAJOR] `AlertDialogCancel` e `AlertDialogAction` da revogação ficam em 36px (`buttonVariants` default `h-9`, sem `min-h-11`), abaixo dos 44px que a própria suíte impõe aos demais botões — e o teste não os vê porque o Radix só monta o conteúdo do diálogo quando aberto e `renderToStaticMarkup` nunca abre.
+
+[MAJOR] `StatusIcon` renderiza os ícones do badge sem classe de tamanho: 24×24 dentro de pílula de 32px com texto de 12px, único ícone do arquivo sem tamanho explícito, em todo cartão e todo viewport.
+
+[MINOR] A garantia "um código pendente por vez" não sobrevive à navegação — sair da rota desmonta sem cancelar, e a RPC só substitui código do mesmo nome/alvo; comentário e título do teste prometem mais que o código. Também: `outdated` é âmbar no badge e vermelho no conselho; `outdated` e `attention` compartilham `AlertTriangle` apesar do comentário afirmar forma própria por estado; asserções fracas em `onboarding-ui.test.tsx` (`lastIndexOf("<svg") > 0` passaria sem o ícone; garantias de layout são nomes de classe Tailwind, não geometria); três cópias não amarradas da versão do agente.
+
+Escopo transferido, não achado: "Testes E2E móvel e desktop" saiu para a task 5 por decisão do usuário — "Passe no navegador na task 5 (QA)" — já registrada em `05_task.md`.
+
+Gates: `bunx tsc --noEmit` exit 0; `bun test tests` 80/80 em 13 arquivos com 360 asserções; `bun run lint` 0 erros e 6 warnings react-refresh pré-existentes. Veredito: MUDANÇAS SOLICITADAS.
+⎿ commit 4fb7ac9+dirty · 12 files changed, 416 insertions(+), 214 deletions(-)
+
+## 2026-09-06 10:32 — [conclusão] Task 4 aprovada na re-review (ciclo 2)
+
+Os quatro major do ciclo 1 estão resolvidos e cada um foi conferido no artefato construído, não no diff. `createAgent` saiu de `src/lib/agents.functions.ts` e do bundle: `grep -rho "createAgent[A-Za-z_]*" .output/server/` devolve só `createAgentPairing`, `createAgentPairing_createServerFn_handler` e `createAgentToken` (geração server-side usada por `/api/public/agent/pair`), com o bundle mais novo que toda fonte. O rastreador de passos emite `<span class="sr-only"> (concluído)/(pendente)` e o teste prova que as fatias do `<ol>` diferem entre `waiting` e `connected`. `AlertDialogCancel` e `AlertDialogAction` receberam `min-h-11`. `StatusIcon` aplica `size-4` nos cinco ramos — render SSR confirmado nesta review: `class="lucide lucide-circle-check size-4"`, que sobrescreve o `width="24"` que o lucide emite como atributo.
+
+Os sete minor também foram endereçados, três deles com teste próprio: `credential-surface.test.ts` fixa a lista fechada de exports do módulo de server functions (guarda a superfície, não a ausência de um símbolo), `version-contract.test.ts` amarra `currentAgentVersion`, `AGENT_VERSION` e `plugin.json`, e o teste de UI passou a exigir quatro formas de ícone distintas. As asserções fracas foram trocadas por asserts nominais e o arquivo agora declara em comentário que os asserts de classe Tailwind são proxy, não geometria.
+
+Regressões procuradas e não encontradas: a mensagem de erro do server fn sobrevive ao round-trip (`server-functions-handler.js` serializa com `toCrossJSONAsync`, `serverFnFetcher.js:178` rejeita com o `Error` reconstruído), então `describePairingError` opera sobre a mensagem real; a remoção de `createAgent` não deixou referência viva e é coerente com `main.md`, que já põe instaladores macOS/Linux FORA do escopo.
+
+gotcha (dashboard): texto renderizado DENTRO do `<label>` que envolve o input entra no nome acessível do campo — a mensagem de nome duplicado em `agents.tsx:100-108` é lida como parte do nome e de novo pelo `aria-describedby` que aponta para ela.
+
+gotcha (dashboard): expiração de sessão não produz `PAIRING_AUTH_REQUIRED` no painel — `requireSupabaseAuth` lança `Unauthorized: Invalid token` antes de qualquer RPC, então o ramo específico de `describePairingError` fica praticamente inalcançável e o caso cai no genérico.
+
+Observações menores registradas em `04_task_review.md`, nenhuma bloqueante: mensagem de duplicidade dentro do `<label>` (OBS-1); a frase manda usar "Reparar" enquanto o botão do cartão pode se chamar "Atualizar", "Reconectar" ou "Refazer instalação" (OBS-2); ramo `PAIRING_AUTH_REQUIRED` não cobre a expiração real (OBS-3); `AddMachineForm` é o único componente da jornada sem cobertura, por não ser exportado (OBS-4).
+
+Gates: `bunx tsc --noEmit` exit 0; `bun test tests` 88/88 em 15 arquivos com 385 asserções; `bun run test:onboarding` 36/36; `bun run lint` 0 erros e 6 warnings react-refresh pré-existentes; build de produção posterior a toda edição de fonte. Escopo transferido, não achado: o passe de navegador segue na task 5 por decisão do usuário. Veredito: APROVADO.
+⎿ commit 4fb7ac9+dirty · 13 files changed, 480 insertions(+), 243 deletions(-)
+
+## 2026-09-06 10:20 — [conclusão] Task 4 aprovada e os quatro pontos do ciclo 2 fechados
+
+Task 4.0 aprovada na re-review. Depois do veredito, as quatro observações minor do ciclo 2 foram corrigidas em vez de viradas dívida, porque três delas eram defeito de acessibilidade de uma linha cada.
+
+O aviso de nome duplicado era filho do `<label>` que envolve o campo: entrava no nome acessível do input E voltava pelo `aria-describedby`, que apontava para o mesmo elemento — a frase anunciada duas vezes. Virou irmão, com `htmlFor`/`id` explícitos no lugar do rótulo implícito. A mensagem também deixou de nomear o botão "Reparar": o rótulo real é `advice.action` e vira "Atualizar", "Reconectar" ou "Refazer instalação" conforme o estado, então o texto apontava para um botão que podia não estar na tela.
+
+`describePairingError` passou a casar "Unauthorized" além de `PAIRING_AUTH_REQUIRED`. Quem barra a sessão expirada é `requireSupabaseAuth`, antes de qualquer RPC: casar só o erro do banco fazia a expiração cair no genérico "verifique sua conexão", mandando a pessoa olhar a rede quando o problema era o login.
+
+`AddMachineForm` saiu do arquivo da rota para `src/components/agent-onboarding.tsx` e virou export — era o único pedaço da jornada cuja prova era ler o código. A regra de nome repetido virou `isDuplicateMachineName` na lib, comparando sem caixa e sem espaço de sobra, com o caso "campo vazio não é duplicata" fixado em teste (uma linha vazia na lista bloquearia o botão para sempre).
+
+gotcha (dashboard): o `Progress` do shadcn desestrutura `value` e nunca o repassa ao `ProgressPrimitive.Root`. A barra andava visualmente pelo `translateX` do indicador enquanto o Root ficava `data-state="indeterminate"` e não emitia `aria-valuenow` — progresso que existe para quem vê e não existe para quem escuta. Vale para qualquer `<Progress>` do projeto, não só o desta SPEC.
+
+gotcha (dashboard): `renderToStaticMarkup` (o `react-dom/server` já é dependência) dá teste de componente real sem instalar runner de DOM — atributos ARIA e classes finais, não grep de fonte. O limite é estrutural e precisa ficar escrito: o Radix só monta conteúdo de diálogo depois de aberto, então `AlertDialog` renderiza zero `<button>` no SSR e nenhum teste de alvo de toque alcança os controles de revogação.
+
+Decisão do usuário (2026-09-06), citação literal: "Remover agora (Recomendado)" — `createAgent` removido. Ele devolvia o token permanente em texto puro ao navegador (RF-3) e ficou órfão quando a jornada nova entrou, mas continuava registrado como handler no bundle. Consequência aceita: adicionar máquina NOVA fora do Windows fica sem caminho, porque `/api/public/agent/pair` só aceita `platform: windows-x64`; agentes existentes seguem sincronizando. `tests/onboarding/credential-surface.test.ts` fixa a lista fechada de exports do módulo, e o rebuild confirmou que `createAgent_createServerFn_handler` sumiu de `.output/server/`.
+
+Decisão do usuário (2026-09-06), citação literal: "Passe no navegador na task 5 (QA)" — o item "Testes E2E móvel e desktop" da task 4 foi transferido para a subtarefa 5.1, com o escopo listado lá: geometria em 360px, diálogo de revogação aberto, `aria-live` em transição real e ordem de foco pelo teclado.
+
+Gates: 92 testes em 15 arquivos (36 só de onboarding, o `verify:` do quarto critério de aceite), typecheck, lint com 0 erros, build de produção e `git diff --check` aprovados.

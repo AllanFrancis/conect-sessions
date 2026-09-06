@@ -7,7 +7,11 @@
     "dev": "vite dev",
     "build": "vite build",
     "build:dev": "vite build --mode development",
+    "build:agent:windows": "bun run scripts/build-agent.mjs",
+    "build:agent:release": "bun run scripts/build-agent-release.mjs",
     "test:installer": "bun test tests/installer",
+    "test:plugin": "bun test tests/plugin",
+    "test:onboarding": "bun test tests/onboarding",
     "preview": "vite preview",
     "lint": "eslint .",
     "format": "prettier --write ."

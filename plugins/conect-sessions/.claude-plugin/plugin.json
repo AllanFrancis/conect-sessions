@@ -1,0 +1,8 @@
+{
+  "name": "conect-sessions",
+  "version": "0.1.0",
+  "description": "Conecta sessões do Claude Code ao painel Conect Sessions",
+  "author": {
+    "name": "Conect Sessions"
+  }
+}

@@ -21,10 +21,10 @@ Empacotar os hooks como plugin removível e publicar os executáveis verificáve
 
 ## Subtarefas
 
-- [ ] 3.1 Criar marketplace, manifesto, hooks e wrapper relativo a CLAUDE_PLUGIN_ROOT
-- [ ] 3.2 Criar workflow que compila dois executáveis baseline e publica hashes em tag
-- [ ] 3.3 Integrar instalação, atualização, recarga e remoção do plugin ao bootstrap
-- [ ] 3.4 Criar e executar validação estrutural e passe local do plugin
+- [x] 3.1 Criar marketplace, manifesto, hooks e wrapper relativo a CLAUDE_PLUGIN_ROOT
+- [x] 3.2 Criar workflow que compila dois executáveis baseline e publica hashes em tag
+- [x] 3.3 Integrar instalação, atualização, recarga e remoção do plugin ao bootstrap
+- [x] 3.4 Criar e executar validação estrutural e passe local do plugin
 
 ## Detalhes de Implementação
 
@@ -38,9 +38,9 @@ Seguir `techspec.md`, Pontos de Integração e decisões de marketplace GitHub.
 
 ## Testes da Tarefa
 
-- [ ] Testes de unidade
-- [ ] Testes de integração
-- [ ] Teste local com Claude Code
+- [x] Testes de unidade
+- [x] Testes de integração
+- [x] Teste local com Claude Code — CLI oficial em perfil isolado adicionou o marketplace, instalou o plugin no escopo do usuário e listou `enabled: true`; evidência em `evidence/task-3-plugin-cli.txt`.
 
 <critical>SEMPRE CRIE E EXECUTE OS TESTES DA TAREFA ANTES DE CONSIDERÁ-LA FINALIZADA</critical>
 
