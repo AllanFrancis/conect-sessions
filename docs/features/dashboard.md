@@ -21,7 +21,9 @@
 - SPEC-20260904-2135 | 2026-09-05 | `PENDENTE` | Sessão é única por (user_id, external_id): duas cópias do agente não duplicam mais
 - SPEC-20260905-1833 | 2026-09-05 | `PENDENTE` | Agente honra CLAUDE_CONFIG_DIR: transcrição fora de ~/.claude deixa de ser invisível
 - SPEC-20260905-1944 | 2026-09-05 | `PENDENTE` | Sessão e lista em layout de celular: conversa com bolhas e cards arredondados
+- SPEC-20260905-2251 | 2026-09-06 | `PENDENTE` | Instalação por um comando no Windows: pareamento de uso único, agente autossuficiente, plugin do Claude Code e jornada guiada de máquinas no painel
 ### Planejadas (future/)
+- SPEC-20260906-1122 | Distribuição por repositório público só de releases — sem ela o comando único não baixa binário em máquina sem credencial de GitHub
 
 ## Estado atual
 

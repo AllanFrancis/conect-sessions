@@ -24,16 +24,9 @@
  * invariante "nunca escrever na sessão errada" deixa de ser risco a mitigar:
  * o hook roda DENTRO da sessão de destino, não há para onde errar.
  *
- * Instalação (settings.json do Claude Code — `--settings` NÃO carrega hook):
- *
- *   "hooks": {
- *     "SessionStart": [{ "hooks": [{ "type": "command",
- *        "command": "node \"C:/caminho/claude-hook.mjs\"" }] }],
- *     "Stop":         [{ "hooks": [{ "type": "command",
- *        "command": "node \"C:/caminho/claude-hook.mjs\"" }] }],
- *     "SessionEnd":   [{ "hooks": [{ "type": "command",
- *        "command": "node \"C:/caminho/claude-hook.mjs\"" }] }]
- *   }
+ * Instalação: o plugin `conect-sessions` registra os eventos em hooks/hooks.json
+ * e chama o executável compilado por um wrapper relativo a CLAUDE_PLUGIN_ROOT.
+ * Nenhum settings.json do usuário é lido ou alterado pelo instalador.
  *
  * Variáveis (as mesmas do agente):
  *   LRC_STATE_DIR=~/.lrc     onde ficam registro e inbox; o agente lê daqui
@@ -50,7 +43,12 @@ import os from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 
-const STATE_DIR = process.env["LRC_STATE_DIR"] || path.join(os.homedir(), ".lrc");
+const HOOK_VERSION = process.env["LRC_HOOK_VERSION"] || "0.1.0";
+
+const stateDirectoryIndex = process.argv.indexOf("--state-dir");
+const configuredStateDirectory =
+  stateDirectoryIndex >= 0 ? process.argv[stateDirectoryIndex + 1] : process.env["LRC_STATE_DIR"];
+const STATE_DIR = configuredStateDirectory || path.join(os.homedir(), ".lrc");
 const SESSIONS_DIR = path.join(STATE_DIR, "sessions");
 const INBOX_DIR = path.join(STATE_DIR, "inbox");
 const LIGADO = process.env["LRC_HOOK"] !== "0";
@@ -373,7 +371,7 @@ function aoEncerrar(input) {
 
 function main(raw) {
   if (!LIGADO) return;
-  const input = JSON.parse(raw || "{}");
+  const input = JSON.parse(String(raw || "{}").replace(/^\uFEFF/, ""));
   if (!input || typeof input.session_id !== "string" || !input.session_id) return;
 
   let saida = null;
@@ -396,16 +394,22 @@ function main(raw) {
   if (saida) process.stdout.write(JSON.stringify(saida));
 }
 
-let raw = "";
-process.stdin.setEncoding("utf8");
-process.stdin.on("data", (c) => (raw += c));
-process.stdin.on("end", () => {
-  try {
-    main(raw);
-  } catch {
-    // Silêncio de propósito: ver a REGRA DE OURO no topo. Uma resposta perdida é
-    // um incômodo; uma sessão de Claude Code travada por hook é o trabalho do
-    // usuário parado em todas as máquinas dele.
-  }
+if (process.argv.includes("--version")) {
+  process.stdout.write(`${HOOK_VERSION}\n`);
   process.exit(0);
-});
+} else {
+  let raw = "";
+  process.stdin.setEncoding("utf8");
+  process.stdin.on("data", (chunk) => (raw += chunk));
+  process.stdin.on("end", () => {
+    try {
+      main(raw);
+    } catch (error) {
+      // Silêncio de propósito: ver a REGRA DE OURO no topo. Uma resposta perdida é
+      // um incômodo; uma sessão de Claude Code travada por hook é o trabalho do
+      // usuário parado em todas as máquinas dele.
+      if (process.env["LRC_HOOK_DEBUG"] === "1") console.error(error);
+    }
+    process.exit(0);
+  });
+}

@@ -1,0 +1,91 @@
+name: Agent release
+
+on:
+  push:
+    tags:
+      - "agent-v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag existente no formato agent-vX.Y.Z"
+        required: true
+        type: string
+
+jobs:
+  build:
+    runs-on: windows-latest
+    permissions:
+      contents: read
+    env:
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.0
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build Windows executables
+        run: bun run build:agent:release
+
+      - name: Generate SHA-256 manifest
+        shell: pwsh
+        run: |
+          if ($env:RELEASE_TAG -notmatch '^agent-v\d+\.\d+\.\d+([-.][0-9A-Za-z.-]+)?$') {
+            throw 'A tag precisa seguir agent-vX.Y.Z.'
+          }
+          $version = $env:RELEASE_TAG -replace '^agent-v', ''
+          $baseUrl = "https://github.com/${{ github.repository }}/releases/download/$env:RELEASE_TAG"
+          $agentHash = (Get-FileHash dist/agent/conect-agent.exe -Algorithm SHA256).Hash.ToLowerInvariant()
+          $hookHash = (Get-FileHash dist/agent/conect-hook.exe -Algorithm SHA256).Hash.ToLowerInvariant()
+          $manifest = [ordered]@{
+            version = $version
+            remoteAgent = [ordered]@{
+              url = "$baseUrl/conect-agent.exe"
+              sha256 = $agentHash
+              platform = 'windows-x64'
+            }
+            claudeHook = [ordered]@{
+              url = "$baseUrl/conect-hook.exe"
+              sha256 = $hookHash
+              platform = 'windows-x64'
+            }
+          }
+          $manifest | ConvertTo-Json -Depth 4 | Set-Content dist/agent/agent-manifest.json -Encoding utf8NoBOM
+
+      - name: Upload verified assets
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: agent-release
+          path: dist/agent/*
+          if-no-files-found: error
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+    steps:
+      - name: Download verified assets
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: agent-release
+          path: dist/agent
+
+      - name: Publish release assets
+        run: >-
+          gh release create "$RELEASE_TAG"
+          dist/agent/conect-agent.exe
+          dist/agent/conect-hook.exe
+          dist/agent/agent-manifest.json
+          --repo "${{ github.repository }}"
+          --verify-tag
+          --generate-notes

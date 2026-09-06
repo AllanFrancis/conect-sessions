@@ -1,0 +1,20 @@
+2026-09-06 — passe local isolado da CLI oficial do Claude Code
+
+Perfil: tmp/claude-plugin-profile (isolado por CLAUDE_CONFIG_DIR)
+Fonte do marketplace: checkout local desta SPEC
+
+1. claude plugin marketplace add <checkout> --scope user
+   Resultado: Successfully added marketplace: conect-sessions
+
+2. claude plugin install conect-sessions@conect-sessions --scope user --yes
+   Resultado: Successfully installed plugin: conect-sessions@conect-sessions (scope: user)
+
+3. claude plugin list --json
+   Resultado confirmado:
+   - id: conect-sessions@conect-sessions
+   - version: 0.1.0
+   - scope: user
+   - enabled: true
+
+4. claude plugin validate plugins/conect-sessions
+   Resultado: Validation passed

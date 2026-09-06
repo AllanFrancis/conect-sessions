@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
+  "name": "conect-sessions",
+  "version": "0.1.0",
+  "description": "Integração oficial do Conect Sessions com Claude Code",
+  "owner": {
+    "name": "Conect Sessions"
+  },
+  "plugins": [
+    {
+      "name": "conect-sessions",
+      "description": "Entrega respostas remotas à sessão correta do Claude Code",
+      "version": "0.1.0",
+      "source": "./plugins/conect-sessions",
+      "category": "productivity"
+    }
+  ]
+}
