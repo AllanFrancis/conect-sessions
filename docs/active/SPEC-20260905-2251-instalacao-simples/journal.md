@@ -2,11 +2,11 @@
 
 ## SNAPSHOT (sobrescrever — DEVE caber nas primeiras 60 linhas do arquivo)
 
-**Última atualização:** 2026-09-06 11:05
+**Última atualização:** 2026-09-06 11:15
 **Onde tô:** task 5 em curso — migration aplicada no remoto e passe de navegador feito em 390/1280px
-**Próximo passo:** passe real em Windows (critério 5, evidência do usuário) e registrar a SPEC em docs/features/dashboard.md
+**Próximo passo:** publicar branch, abrir o repo, tagear agent-v0.1.0 e só então o passe real em Windows
 **Última decisão:** histórico de migrations reconciliado por `repair` e a de pareamento aplicada em produção
-**Bloqueio atual:** sessão do navegador expirou (login é OAuth Google); e o passe real em Windows depende do usuário
+**Bloqueio atual:** repo PRIVADO e sem release — instalador e plugin baixam sem credencial; push barrado por permissão
 **Se retomar, ler:** main.md, prd.md, techspec.md, 05_task.md, 04_task_review.md e esta SNAPSHOT
 
 ### Fases
@@ -355,3 +355,38 @@ achados do passe ficaram sem correção de propósito, com justificativa na entr
 toque do `termLinkClass` (compartilhado por todas as telas), o contador que compara relógio do cliente
 com `expires_at` do servidor, e um redirecionamento para `/auth` visto uma vez em modo dev, não
 reproduzido de forma limpa.
+
+## 2026-09-06 11:15 — [blocker] Critério 5 é inalcançável hoje: repositório privado e sem release
+
+Usuário pediu merge na main e push, e escolheu "Vou fazer o passe agora" para o critério 5. Verificação
+antes de ele gastar tempo achou três bloqueios encadeados.
+
+O merge em si não pode acontecer agora: levaria 18 arquivos e 1514 linhas para `docs/active/` na main,
+que hoje só tem `.gitkeep`. É a proibição TIER-0 nº 3, e o gate de CI reprovaria de qualquer forma. O
+caminho é fechar a SPEC primeiro, porque o `close` arquiva `docs/active/` → `docs/archive/`.
+
+O fechamento depende do critério 5, e o critério 5 depende de coisas que não existem:
+- `gh release list` devolve VAZIO — nenhum release publicado, nenhuma tag `agent-v*`.
+- o repositório é PRIVADO (`gh repo view` → visibility PRIVATE).
+- o workflow `.github/workflows/agent-release.yml` não está no GitHub: vive só nesta branch, que não
+  foi publicada.
+
+gotcha (dashboard): o instalador baixa `releases/latest/download/agent-manifest.json` com
+`Invoke-WebRequest` e SEM credencial, e o `claude plugin marketplace add 'AllanFrancis/conect-sessions'`
+também assume acesso anônimo. Em repositório privado os dois retornam 404. A techspec já registrava a
+dependência ("a primeira versão depende de repositório/release públicos"), mas ela nunca foi satisfeita —
+e nenhum teste pega isso, porque todos usam manifesto e binários locais.
+
+Sequência necessária, nesta ordem: publicar a branch → tornar o repositório público (ou trocar a
+distribuição por um host que sirva sem credencial, o que é mudança de contrato e daria SPEC nova) →
+tagear `agent-v0.1.0` para o workflow construir e publicar os dois `.exe` e o manifesto → só então o
+comando único funciona e o passe real é possível.
+
+Auditoria de segredo feita porque tornar público é irreversível na prática: `.env` esteve versionado em
+`d04fedd` e saiu em `46eb137`. O conteúdo é `PROJECT_ID`, `URL` e `PUBLISHABLE_KEY` — a publishable é
+pública por design (vai no bundle do navegador) e não há `SERVICE_ROLE_KEY` em lugar nenhum do histórico.
+Além disso o projeto ali é `wrbvs…`, o ANTIGO, abandonado na consolidação; o atual é `davpyrmcygwdjxfwpwhk`.
+Risco baixo, mas vale o usuário confirmar que o projeto antigo está desativado antes de abrir o repo.
+
+O `git push` da branch foi barrado pelo classificador de permissões desta sessão. Não foi contornado.
+Nada foi enviado ao remoto; os cinco commits seguem apenas locais.
