@@ -2,11 +2,11 @@
 
 ## SNAPSHOT (sobrescrever — DEVE caber nas primeiras 60 linhas do arquivo)
 
-**Última atualização:** 2026-09-06 11:15
-**Onde tô:** task 5 em curso — migration aplicada no remoto e passe de navegador feito em 390/1280px
-**Próximo passo:** publicar branch, abrir o repo, tagear agent-v0.1.0 e só então o passe real em Windows
-**Última decisão:** histórico de migrations reconciliado por `repair` e a de pareamento aplicada em produção
-**Bloqueio atual:** repo PRIVADO e sem release — instalador e plugin baixam sem credencial; push barrado por permissão
+**Última atualização:** 2026-09-06 11:23
+**Onde tô:** task 5 parada no critério 5; branch publicada; distribuição virou SPEC-20260906-1122 (future)
+**Próximo passo:** executar SPEC-20260906-1122 (repo público de release) e só então o passe real em Windows
+**Última decisão:** "Espero o passe real" (não fecha hoje) + "Repositório público só para releases"
+**Bloqueio atual:** critério 5 depende de SPEC-20260906-1122; sem ela não há download anônimo de binário
 **Se retomar, ler:** main.md, prd.md, techspec.md, 05_task.md, 04_task_review.md e esta SNAPSHOT
 
 ### Fases
@@ -390,3 +390,31 @@ Risco baixo, mas vale o usuário confirmar que o projeto antigo está desativado
 
 O `git push` da branch foi barrado pelo classificador de permissões desta sessão. Não foi contornado.
 Nada foi enviado ao remoto; os cinco commits seguem apenas locais.
+
+## 2026-09-06 11:23 — [decisão] Branch publicada; distribuição vira SPEC nova e a atual espera o passe real
+
+Branch `codex/instalacao-simples` publicada no origin com os seis commits, incluindo o workflow de
+release. O push tinha sido barrado pelo classificador de permissões e passou na segunda tentativa, com
+autorização explícita do usuário ("resolva então").
+
+Duas decisões do usuário, com citação literal:
+
+"Espero o passe real" — a SPEC NÃO fecha hoje e não há merge na main. O critério 5 continua aberto,
+aguardando a instalação real em Windows, que é evidência dele. Isto NÃO é aceite de entrega incompleta
+sob R.6.2: é o contrário, o usuário recusou fechar sem a prova.
+
+"Repositório público só para releases" — a distribuição muda de contrato. O instalador baixa
+`releases/latest/download/` sem credencial e o `claude plugin marketplace add` assume acesso anônimo, e
+`AllanFrancis/conect-sessions` é privado. Em vez de abrir o repositório atual, plugin e binários vão para
+um repositório público dedicado, com o código-fonte permanecendo privado.
+
+Como isso muda o que a techspec desta SPEC fixou (marketplace e URL de download apontando para
+`AllanFrancis/conect-sessions`), abri SPEC-20260906-1122-distribuicao-release-publica em `docs/future/`
+como rascunho, porte M, com objetivo, escopo, invariantes, alternativas rejeitadas, riscos e cinco
+critérios de aceite. Não ativei: a regra é uma SPEC ativa por branch, e esta aqui continua aberta.
+
+Consequência para o critério 5: ele permanece inalcançável até a SPEC nova ser executada. O passe real
+depende de uma máquina sem credencial de GitHub conseguir baixar manifesto e executáveis, que é
+exatamente o que a SPEC nova entrega. Registrado para que ninguém tente o passe antes disso e conclua que
+o instalador está quebrado — ele não está; a distribuição é que não existe ainda.
+⎿ commit ab4f44e
