@@ -3,9 +3,12 @@ import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 const hookPath = resolve("public/agent/claude-hook.mjs");
-const stateDirectory = resolve(
-  "docs/active/SPEC-20260905-2251-instalacao-simples/tmp/plugin-runtime-test",
-);
+// `.scratch/` e não `docs/active/<SPEC>/tmp/`: a SPEC que originou este teste foi
+// arquivada, e o `mkdirSync` recursivo RECRIAVA `docs/active/SPEC-…/` a cada run.
+// O `afterAll` limpa o state dir e deixava a pasta da SPEC para trás, violando
+// "docs/active vazio em main" — sem o git ver, porque diretório vazio não entra
+// no índice. Harness não escolhe onde mora o descartável: sem SPEC ativa é `.scratch/`.
+const stateDirectory = resolve(".scratch/plugin-runtime-test");
 const wrapperPath = resolve("plugins/conect-sessions/scripts/invoke-hook.ps1");
 const wrapperProfile = join(stateDirectory, "wrapper-profile");
 const timeoutProfile = join(stateDirectory, "timeout-profile");
