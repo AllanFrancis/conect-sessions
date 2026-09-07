@@ -2,7 +2,7 @@
 
 ## SNAPSHOT (sobrescrever — DEVE caber nas primeiras 60 linhas do arquivo)
 
-**Última atualização:** 2026-09-06 19:50
+**Última atualização:** 2026-09-07 00:04
 **Onde tô:** início — nada feito ainda
 **Próximo passo:** <primeiro passo concreto>
 **Última decisão:** —
@@ -64,3 +64,5 @@ Falta apenas o agente EMITIR e a lista NÃO FILTRAR.
 Cuidado registrado: incluir o estado na lista encosta na DEC-20260904-1443 (lista só de ativas). A
 inclusão deve ser explícita para `waiting`, não remoção do filtro.
 ⎿ commit 1a3a205+dirty · 2 files changed, 8 insertions(+), 1 deletion(-)
+
+## 2026-09-07 00:04 — [ativação] SPEC ativada (branch feature/kiro-aguardando-usuario-visivel, base main)

@@ -1,16 +1,16 @@
 # SPEC-20260906-1932: sessão do Kiro esperando o usuário fica visível no painel
 
-**Status:** draft
+**Status:** active
 **Porte:** P
 **Owner:** @AllanFrancis
 **Criada:** 2026-09-06 19:32
-**Ativada:** —
+**Ativada:** 2026-09-07 00:04
 **Concluída:** —
 **Pausada em:** —
 **Commit final:** —
 **Keywords:** kiro, status, waiting, painel, aprovação
 **Features:** dashboard
-**Branch:** —
+**Branch:** feature/kiro-aguardando-usuario-visivel
 **Programa:** entrega-remota
 **Workspace:** —
 **Origem:** usuário em 2026-09-06 19:32 ("4. SPEC nova")
