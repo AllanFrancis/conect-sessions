@@ -13,22 +13,48 @@ import { installerHeaders, renderAgentInstaller } from "@/lib/agent-installer";
  * volta uma resposta endereçada àquela sessão. O valor gravado em Run é
  * executado literalmente para simular o logon.
  *
- * Isolamento: USERPROFILE aponta para um perfil descartável, então o agente não
- * enxerga as sessões reais de Claude Code e Kiro desta máquina — o que também
- * mantém o teste rápido e determinístico. APPDATA fica intacto porque é de lá
- * que o DPAPI carrega a chave-mestra do usuário.
+ * Isolamento: USERPROFILE e CLAUDE_CONFIG_DIR apontam para um perfil descartável,
+ * então o agente não enxerga as sessões reais de Claude Code e Kiro desta máquina
+ * — o que também mantém o teste rápido e determinístico. APPDATA fica intacto
+ * porque é de lá que o DPAPI carrega a chave-mestra do usuário.
  *
  * Fora do alcance da automação, e por isso ainda manual no critério de aceite 5:
  * baixar do release real do GitHub (SmartScreen, URL do asset) e o round-trip
  * dentro do Claude Code, que depende do plugin da task 3.
  */
 
-const tempRoot = resolve("docs/active/SPEC-20260905-2251-instalacao-simples/tmp/windows-e2e");
+/**
+ * `.scratch/` e não `docs/active/<SPEC>/tmp/`: a SPEC que originou este teste já
+ * foi arquivada, e o `mkdirSync` recursivo recriava a pasta em `docs/active/` a
+ * cada execução — violando "docs/active vazio em main" sem o git ver, porque
+ * diretório vazio não entra no índice. Sem SPEC ativa, descartável mora em
+ * `.scratch/`.
+ */
+const tempRoot = resolve(".scratch/windows-e2e");
 const realAgentPath = join(tempRoot, "release", "conect-agent.exe");
 const isolatedHome = join(tempRoot, "profile");
 const installRoot = join(tempRoot, "Conect Sessions");
 const testRunRoot = "HKCU:\\Software\\ConectSessionsE2E";
 const testRunKey = `${testRunRoot}\\Run`;
+
+/**
+ * O ambiente que o agente do teste herda.
+ *
+ * `USERPROFILE` sozinho NÃO isola: `CLAUDE_CONFIG_DIR` aponta para outro disco em
+ * máquinas de desenvolvimento (medido em 2026-09-06:
+ * `D:\VSCodeProfiles\...\Claude`), e o agente lê essa variável antes de cair no
+ * `~/.claude`. Sem sobrescrevê-la, o agente do teste enxergava as sessões REAIS
+ * desta máquina, uma delas sincronizava primeiro e consumia a única resposta que
+ * o servidor de mentira entrega — o inbox da sessão semeada nunca aparecia e o
+ * teste estourava por tempo. Apontar para dentro do perfil descartável (pasta que
+ * não existe) faz a lista de homes do agente ficar vazia, que é o que este teste
+ * quer.
+ */
+const isolatedEnv = () => ({
+  ...process.env,
+  USERPROFILE: isolatedHome,
+  CLAUDE_CONFIG_DIR: join(isolatedHome, ".claude"),
+});
 
 const pairingCode = "e".repeat(64);
 const permanentToken = `lrc_${"f".repeat(48)}`;
@@ -69,7 +95,7 @@ async function runPowerShell(command: string) {
       stdout: "ignore",
       stderr: "ignore",
       stdin: "ignore",
-      env: { ...process.env, USERPROFILE: isolatedHome },
+      env: isolatedEnv(),
     },
   );
   const exitCode = await child.exited;
@@ -124,7 +150,7 @@ async function runStoredCommand(commandLine: string) {
     stdout: "ignore",
     stderr: "ignore",
     stdin: "ignore",
-    env: { ...process.env, USERPROFILE: isolatedHome },
+    env: isolatedEnv(),
   });
   return { argv, exitCode: await child.exited };
 }
