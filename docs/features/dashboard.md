@@ -24,8 +24,8 @@
 - SPEC-20260905-2251 | 2026-09-06 | `PENDENTE` | Instalação por um comando no Windows: pareamento de uso único, agente autossuficiente, plugin do Claude Code e jornada guiada de máquinas no painel
 - SPEC-20260906-1146 | 2026-09-06 | `PENDENTE` | Bootstrap servido sem BOM: o comando único voltou a ser aceito por [scriptblock]::Create()
 - SPEC-20260906-1932 | 2026-09-06 | `PENDENTE` | O agente escreve o próprio `agent.log` (o launcher parou de redirecionar): motivo do sync, entrega por sessão e id, nunca o token nem o texto
+- SPEC-20260906-1932 | 2026-09-07 | `PENDENTE` | Sessão do Kiro esperando o usuário fica visível no painel (`waiting`)
 ### Planejadas (future/)
-- SPEC-20260906-1932-kiro-aguardando-usuario-visivel | Sessão do Kiro esperando o usuário fica visível no painel | `waiting_on_user` não tem braço no adaptador, cai em `unknown`, e a lista filtra `active`
 - SPEC-20260906-1932-stop-espera-resposta-remota | A resposta remota chega na sessão parada | o `Stop` drena o inbox uma vez e sem esperar; em sessão idle nenhum hook dispara e a fala fica no arquivo
 - SPEC-20260906-1932-permissao-remota-ponta-a-ponta | Pedido de permissão vai e volta pelo painel | `LRC_PERM` nasce desligado e nada no produto o liga; o `pending/` não é lido nem sincronizado
 - SPEC-20260906-1932-investigar-injecao-no-kiro | Existe caminho para responder uma sessão do Kiro? | resposta para Kiro é marcada `delivered` e descartada pelo agente; a UI oferece botão sem canal de volta
@@ -104,9 +104,19 @@ O round-trip ganhou as três garantias que faltavam para ele ser confiável sob 
   normaliza para a MESMA estrutura (`meta.ask`, `meta.answers_tool_use_id`) em vez de a UI aprender
   o formato de cada agente. Trade-off: IDE nova exige trabalho no agente, não na UI — que é onde a
   gente quer o trabalho.
-- DEC-20260904-1443-lista-somente-ativas [ativa] (SPEC-20260904-1433) — a lista filtra
-  `status = 'active'` no servidor, não no cliente: as sessões idle/finished/unknown nem trafegam.
-  Trade-off aceito: elas deixam de ser alcançáveis pelo painel e só abrem por URL direta.
+- DEC-20260904-1443-lista-somente-ativas [ativa] (SPEC-20260904-1433, ampliada pela
+  SPEC-20260906-1932-kiro-aguardando-usuario-visivel) — a lista filtra por status no SERVIDOR, não
+  no cliente: as sessões idle/finished/unknown nem trafegam. Trade-off aceito: elas deixam de ser
+  alcançáveis pelo painel e só abrem por URL direta. O conjunto passou de `active` para
+  `STATUS_NO_PAINEL = ["active", "waiting"]` — a inclusão é DESSE estado, não um afrouxamento: a
+  sessão que espera o usuário não anda sozinha e é a razão de o painel existir.
+- DEC-20260907-0030-espera-e-um-estado-so [ativa] (SPEC-20260906-1932-kiro-aguardando-usuario-visivel)
+  — pergunta do Kiro (`waiting_on_user`) e aprovação de ferramenta pendente
+  (`ToolApproval] Requesting permission`) publicam o MESMO estado `waiting`, em vez de um campo
+  próprio para a aprovação. É literalmente a mesma situação (o turno não anda sem a pessoa), e dois
+  nomes obrigariam o usuário a aprender a diferença. Trade-off: a distinção entre as duas causas só
+  existe em `evidence[]`, visível no `--probe` e não no painel. Campo próprio custaria coluna nova
+  em `sessions`, e mudança de schema estava fora do escopo.
 
 ## Alternativas consideradas e rejeitadas
 
@@ -247,3 +257,24 @@ partir de dois prints do app do Claude Code. Muda o ARRANJO; a paleta e a tipogr
 - **Nao copiado do print, de proposito**: filtro "Todos" (reverteria a SPEC-20260904-1433, decisao do
   usuario) e FAB "Nova sessao" (o painel nao cria sessao; quem cria e a IDE). `Menu` so entrou com
   acao real.
+
+### Delta de estado (SPEC-20260906-1932-kiro-aguardando-usuario-visivel, 2026-09-07 00:30)
+
+A sessão que MAIS precisa de atenção remota era a única que o painel não mostrava. O Kiro grava
+`status: "waiting_on_user"` quando o turno para para perguntar; o adaptador não tinha braço para
+esse valor e caía em `unknown`, e a lista, presa em `.eq("status", "active")`, nunca a trazia. O
+usuário só descobria a pergunta chegando no computador — exatamente o que o produto existe para
+evitar.
+
+- **Medir antes de codar mudou a implementação.** A SPEC supunha que `waiting_on_user` caía no
+  `else` final da cadeia de `declared`. Não caía: as duas sessões reais desta máquina eram barradas
+  antes, no braço "Kiro vivo mas sessão ausente do log desta execução", que decidia por presença no
+  log sem sequer olhar o `status` declarado. Mapear só a cadeia de `declared` não teria movido
+  nenhuma sessão real de `unknown`.
+- **Derivação nova**: com o Kiro vivo, `waiting_on_user` vira `waiting` — `confirmed` quando a
+  sessão está no log da execução, `inferred` quando só o workspace dela está aberto. Sem Kiro vivo
+  acompanha `idle`/`failed` e vira `finished`: pergunta congelada não espera ninguém.
+- **`waiting_on_user` não vaza**: é vocabulário do Kiro; o transporte é `waiting`, que o zod de
+  `/sync` já aceitava. Zero mudança de schema.
+- **Lista**: o filtro virou `STATUS_NO_PAINEL` (`src/lib/session-display.ts`), exportado para poder
+  ser testado — a consulta inline não era provável sem um navegador logado.
