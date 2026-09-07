@@ -7,7 +7,7 @@
   "team": "solo",
   "product": null,
   "commands": {
-    "test": "",
+    "test": "bun test tests/installer tests/onboarding tests/plugin",
     "typecheck": "bunx tsc --noEmit",
     "lint": "bun run lint",
     "dev": "bun run dev",
