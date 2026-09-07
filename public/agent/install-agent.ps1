@@ -290,7 +290,7 @@ if (-not $NoStart) {
     Start-Sleep -Milliseconds 500
   }
   if (-not $live) {
-    throw 'O agente não permaneceu em execução. Veja agent.err.log na pasta de instalação e rode o reparo do painel.'
+    throw 'O agente não permaneceu em execução. Veja agent.log na pasta de instalação e rode o reparo do painel.'
   }
   Write-InstallLog ('Agente em execução (PID {0}).' -f $live.ProcessId)
 }

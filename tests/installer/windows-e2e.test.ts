@@ -300,9 +300,31 @@ describe("E2E do comando único com o agente compilado", () => {
     expect(inbox).toContain(replyContent);
     expect(JSON.parse(inbox.trim().split("\n")[0]).id).toBe("reply-e2e");
 
-    // Nada de token em disco em claro, nem no log do instalador.
+    // --- 3b. o agente deixou rastro em disco --------------------------------
+    //
+    // Aqui é o único lugar da suíte onde o binário REAL (compilado com
+    // `--windows-hide-console`) é iniciado pelo launcher REAL. É a condição exata
+    // do defeito que originou o log: `agent.log` com 0 byte depois de horas de
+    // agente vivo, porque processo sem console não entrega nada ao
+    // `-RedirectStandardOutput`. Se esta asserção cair, o log voltou a ser
+    // decorativo.
+    const agentLogPath = join(installRoot, "agent.log");
+    const agentLog = await waitFor("o rastro da entrega em agent.log", () => {
+      const conteudo = existsSync(agentLogPath) ? readFileSync(agentLogPath, "utf8") : "";
+      return conteudo.includes("reply-e2e") ? conteudo : null;
+    });
+    expect(agentLog).toContain("iniciado");
+    expect(agentLog).toContain("tick 1");
+    expect(agentLog).toContain(`sessão=${sessionId}`);
+
+    // Nada de token em disco em claro, nem no log do instalador, nem no do agente
+    // — que fica na pasta de instalação sem a proteção DPAPI do config.json. O
+    // texto da resposta também não: no log vai o tamanho, o inbox é que tem o
+    // conteúdo.
     expect(readFileSync(join(installRoot, "config.json"), "utf8")).not.toContain(permanentToken);
     expect(readFileSync(join(installRoot, "install.log"), "utf8")).not.toContain(permanentToken);
+    expect(agentLog).not.toContain(permanentToken);
+    expect(agentLog).not.toContain(replyContent);
 
     // --- 4. logon: o valor gravado em Run é executado literalmente -----------
     const runCommand = (

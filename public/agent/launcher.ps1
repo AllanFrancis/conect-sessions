@@ -50,13 +50,18 @@ try {
   }
 
   if ($shouldStart) {
-    foreach ($name in @('agent.log', 'agent.err.log')) {
-      $file = Join-Path $installRoot $name
-      if ((Test-Path -LiteralPath $file) -and (Get-Item -LiteralPath $file).Length -gt 2MB) {
-        Move-Item -LiteralPath $file -Destination "$file.1" -Force
-      }
-    }
+    <#
+    A rotação saiu daqui: quem gira `agent.log` agora é o próprio agente, a cada
+    escrita e no mesmo limite de 2MB. Rodar só no start deixava o arquivo crescer
+    sem teto numa máquina ligada por semanas — e, pior, o redirecionamento abaixo
+    prendia um handle no arquivo, o que fazia o rename da rotação falhar.
 
+    `agent.err.log` deixa de ser escrito: o agente grava uma trilha única com o
+    nível na linha, porque o que o diagnóstico precisa é da ORDEM entre "o tick fez
+    X" e "o sync falhou por Y". Um `agent.err.log` de instalação antiga fica para
+    trás inofensivo; a rotação dele vira responsabilidade de ninguém porque ele
+    para de crescer.
+    #>
     $config = Get-Content -LiteralPath $configPath -Raw | ConvertFrom-Json
     Add-Type -AssemblyName System.Security
     $cipher = [Convert]::FromBase64String([string]$config.protectedToken)
@@ -71,11 +76,20 @@ try {
     $env:LRC_AGENT_PLATFORM = 'windows-x64'
     $env:LRC_PLUGIN_STATUS = if ([string]::IsNullOrWhiteSpace([string]$config.pluginStatus)) { 'unknown' } else { [string]$config.pluginStatus }
     $env:LRC_STATE_DIR = Join-Path $installRoot 'state'
+    $env:LRC_LOG_FILE = Join-Path $installRoot 'agent.log'
 
+    <#
+    Sem `-RedirectStandardOutput`/`-RedirectStandardError`, de propósito.
+
+    O executável é compilado com `--windows-hide-console` e um processo sem console
+    não entrega nada ao redirecionamento: medido em 2026-09-06, `agent.log` com 0
+    byte depois de 7h30 de agente vivo. O redirecionamento não recuperava saída
+    NENHUMA e ainda mantinha um handle preso no arquivo, bloqueando a rotação. O
+    agente escreve com handle próprio, no caminho que `LRC_LOG_FILE` acabou de
+    dizer.
+    #>
     try {
-      $process = Start-Process -FilePath $agentPath -WindowStyle Hidden -PassThru `
-        -RedirectStandardOutput (Join-Path $installRoot 'agent.log') `
-        -RedirectStandardError (Join-Path $installRoot 'agent.err.log')
+      $process = Start-Process -FilePath $agentPath -WindowStyle Hidden -PassThru
     }
     finally {
       $env:LRC_TOKEN = $null

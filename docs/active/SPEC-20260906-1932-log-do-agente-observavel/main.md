@@ -1,16 +1,16 @@
 # SPEC-20260906-1932: log do agente que existe em disco
 
-**Status:** draft
+**Status:** active
 **Porte:** P
 **Owner:** @AllanFrancis
 **Criada:** 2026-09-06 19:32
-**Ativada:** —
+**Ativada:** 2026-09-06 21:45
 **Concluída:** —
 **Pausada em:** —
 **Commit final:** —
 **Keywords:** agente, log, diagnóstico, observabilidade
 **Features:** dashboard
-**Branch:** —
+**Branch:** feature/log-do-agente-observavel
 **Programa:** entrega-remota
 **Workspace:** —
 **Origem:** usuário em 2026-09-06 19:32 ("5. SPEC nova")

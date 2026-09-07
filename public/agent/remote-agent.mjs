@@ -29,6 +29,8 @@
  *   LRC_PROC_TTL=4000                    cache do snapshot de processos em ms
  *   LRC_MONITOR=0                        desliga a camada de session monitoring
  *   LRC_CONCURRENCY=4                    syncs de estado simultâneos por tick
+ *   LRC_LOG_FILE=/caminho/agent.log      arquivo de log do agente (o launcher passa este caminho)
+ *   LRC_LOG=info                         nível: 0/off | error | info (default) | debug
  */
 
 import fs from "node:fs";
@@ -54,6 +56,7 @@ const REPLY_FILE = process.env.LRC_REPLY_FILE || "";
 const PROC_TTL = Number(process.env.LRC_PROC_TTL || 4000);
 const MONITOR_ON = process.env.LRC_MONITOR !== "0";
 const SYNC_CONCURRENCY = Math.max(1, Number(process.env.LRC_CONCURRENCY || 4));
+const LOG_LEVEL_ENV = (process.env.LRC_LOG || "").trim().toLowerCase();
 
 if (!PROBE && !SHOW_VERSION && (!URL_BASE || !TOKEN)) {
   console.error("Defina LRC_URL e LRC_TOKEN (ou rode com --probe para só diagnosticar).");
@@ -121,6 +124,108 @@ const KIRO_SESSIONS_DIR = path.join(KIRO_HOME, "sessions"); // <wsHash>/sess_<uu
 const KIRO_INDEX_DIR = path.join(KIRO_HOME, "session-index"); // <wsHash>.jsonl
 const KIRO_LOGS_DIR = path.join(KIRO_HOME, "logs"); // <YYYYMMDDTHHmmssSSS>/kiro.log
 const KIRO_USER_DATA = path.join(APP_DATA, "Kiro");
+
+// ---------------------------------------------------------------------------
+// log em arquivo
+// ---------------------------------------------------------------------------
+
+/**
+ * Por que o agente escreve o próprio log em vez de confiar no stdout.
+ *
+ * O executável é compilado com `--windows-hide-console`, e um processo sem
+ * console não entrega nada ao `-RedirectStandardOutput` de quem o iniciou:
+ * medido em 2026-09-06, `agent.log` estava com 0 byte depois de 7h30 de agente
+ * vivo. Todas as linhas de diagnóstico existiam no fonte e em lugar nenhum na
+ * máquina. Escrever daqui, com handle próprio, é o que faz a próxima falha de
+ * entrega ser LIDA em vez de adivinhada.
+ *
+ * Um arquivo só, com nível na linha, e não `agent.log` + `agent.err.log`: o que
+ * dificulta o diagnóstico é justamente perder a ordem entre "o tick fez X" e "o
+ * sync falhou por Y". Separar as duas metades da mesma história em dois arquivos
+ * é o custo que não vale.
+ */
+const LOG_LEVELS = { error: 1, info: 2, debug: 3 };
+
+const LOG_LEVEL = (() => {
+  if (LOG_LEVEL_ENV === "0" || LOG_LEVEL_ENV === "off") return 0;
+  return LOG_LEVELS[LOG_LEVEL_ENV] ?? LOG_LEVELS.info;
+})();
+
+/**
+ * Onde gravar — por env, nunca por dedução do executável.
+ *
+ * O agente não sabe onde foi instalado (não usa `process.execPath` para nada), e
+ * é o launcher que conhece o install root. `LRC_LOG_FILE` é o caminho explícito;
+ * o fallback só vale quando `LRC_STATE_DIR` veio de fora, porque aí `state/` é
+ * irmão de `agent.log`. Rodando o fonte do repositório, as duas faltam e o
+ * resultado é `null`: nada de arquivo, só console. Log em disco é da instalação,
+ * não de quem tem terminal na frente.
+ */
+const LOG_FILE = (() => {
+  if (LOG_LEVEL === 0) return null;
+  const explicito = (process.env.LRC_LOG_FILE || "").trim();
+  if (explicito) return path.resolve(explicito);
+  return process.env.LRC_STATE_DIR ? path.join(path.dirname(STATE_DIR), "agent.log") : null;
+})();
+
+/** Mesmo limite que o launcher aplicava (2MB) — o esquema não mudou, só o dono. */
+const LOG_MAX_BYTES = 2 * 1024 * 1024;
+
+/** Tamanho corrente do arquivo. `null` = ainda não medido nesta execução. */
+let logBytes = null;
+
+/**
+ * O token nunca vai a disco. `agent.log` fica na pasta de instalação sem a
+ * proteção DPAPI que o `config.json` tem, então a garantia é por construção:
+ * toda linha passa por aqui antes de existir em qualquer lugar. O piso de 12
+ * caracteres evita o caso patológico de um token curto/degenerado transformar a
+ * substituição em picadinho do log.
+ */
+function redigir(texto) {
+  return TOKEN.length >= 12 ? texto.replaceAll(TOKEN, "***") : texto;
+}
+
+/**
+ * Rotação e append. Fail-open por decreto: log é instrumento, e instrumento que
+ * derruba o tick é pior do que instrumento nenhum — por isso todo o corpo está
+ * sob `catch` que engole.
+ *
+ * Uma geração só (`.1`, sobrescrita), igual ao que o launcher fazia. A diferença
+ * é que agora a checagem acontece a cada escrita, e não uma vez por start: era
+ * isso que deixava o arquivo crescer sem teto numa máquina ligada por semanas.
+ */
+function writeLog(linha) {
+  if (!LOG_FILE) return;
+  try {
+    const buf = Buffer.from(linha, "utf8");
+    if (logBytes === null) logBytes = statOf(LOG_FILE)?.size ?? 0;
+    if (logBytes > 0 && logBytes + buf.length > LOG_MAX_BYTES) {
+      fs.renameSync(LOG_FILE, `${LOG_FILE}.1`);
+      logBytes = 0;
+    }
+    fs.appendFileSync(LOG_FILE, buf);
+    logBytes += buf.length;
+  } catch {
+    // Silêncio de propósito: reclamar de falha de log só pode ser feito... no log.
+  }
+}
+
+/**
+ * A saída de diagnóstico do agente. Vai ao console (para quem roda em primeiro
+ * plano) E ao arquivo (para a máquina instalada, onde console não existe).
+ *
+ * No arquivo a linha é achatada em uma só: um corpo de erro do servidor com
+ * quebras de linha transformaria o log em algo que nenhum `Select-String` lê.
+ * O console recebe o texto como veio.
+ */
+function log(nivel, ...partes) {
+  const msg = redigir(partes.map((p) => (typeof p === "string" ? p : String(p))).join(" "));
+  if (nivel === "error") console.error(msg);
+  else console.log(msg);
+  if (LOG_LEVELS[nivel] > LOG_LEVEL) return;
+  const tag = nivel.toUpperCase().padEnd(5, " ");
+  writeLog(`${new Date().toISOString()} ${tag} ${msg.replace(/\r?\n/g, " ")}\n`);
+}
 
 // ---------------------------------------------------------------------------
 // utilidades
@@ -1458,20 +1563,21 @@ async function postSync(session, messages) {
 
       const corpo = await res.text();
       if (res.status < 500) {
-        console.error("sync recusado:", res.status, corpo);
+        log("error", "sync recusado:", res.status, corpo);
         return null;
       }
       if (ultima) {
-        console.error("sync falhou:", res.status, corpo);
+        log("error", "sync falhou:", res.status, corpo);
         return null;
       }
-      console.error(`sync falhou: ${res.status} — nova tentativa em ${BACKOFF_MS[tentativa]}ms`);
+      log("error", `sync falhou: ${res.status} — nova tentativa em ${BACKOFF_MS[tentativa]}ms`);
     } catch (err) {
       if (ultima) {
-        console.error("sync falhou:", motivoDaFalha(err));
+        log("error", "sync falhou:", motivoDaFalha(err));
         return null;
       }
-      console.error(
+      log(
+        "error",
         `sync falhou: ${motivoDaFalha(err)} — nova tentativa em ${BACKOFF_MS[tentativa]}ms`,
       );
     }
@@ -1498,6 +1604,10 @@ function deliverReplies(data, label) {
     const origem = daSessaoSincronizada
       ? label
       : `outra sessão (${externalId ?? reply.session_id})`;
+    // `console.log` e NÃO `log()`, de propósito: esta linha contém o texto que o
+    // usuário escreveu. Console é efêmero; `agent.log` fica na pasta de instalação
+    // sem a proteção DPAPI do `config.json`. O rastro em disco é o de
+    // `entregarNaSessao` — id, sessão e tamanho, nunca o conteúdo.
     console.log(`\n>> resposta remota para ${origem}:\n${reply.content}\n`);
     entregarNaSessao(externalId, reply);
     if (REPLY_FILE) fs.appendFileSync(REPLY_FILE, `${reply.content}\n`);
@@ -1506,7 +1616,7 @@ function deliverReplies(data, label) {
         "{{session}}",
         reply.session_id ?? data.session_id,
       );
-      exec(cmd, (err) => err && console.error("comando de resposta falhou:", err.message));
+      exec(cmd, (err) => err && log("error", "comando de resposta falhou:", err.message));
     }
   }
 }
@@ -1526,11 +1636,27 @@ function deliverReplies(data, label) {
  * e prometer entrega onde não foi provado é exatamente o que o contrato proíbe.
  */
 function entregarNaSessao(externalId, reply) {
-  if (typeof externalId !== "string") return;
+  // Os dois desvios abaixo eram `return` mudos, e é por isso que o diagnóstico de
+  // 2026-09-06 não conseguiu separar "a resposta não chegou ao agente" de "chegou
+  // e foi descartada aqui". Agora cada um deixa linha — o TAMANHO do texto, nunca
+  // o texto, que é conteúdo do usuário e não vai para disco desprotegido.
+  if (typeof externalId !== "string") {
+    log(
+      "error",
+      `resposta ${reply.id} descartada: sem external_id (servidor antigo?) · bytes=${reply.content?.length ?? 0}`,
+    );
+    return;
+  }
   const sep = externalId.indexOf(":");
   const agent = externalId.slice(0, sep);
   const sessionId = externalId.slice(sep + 1);
-  if (agent !== "claude-code" || !sessionId) return;
+  if (agent !== "claude-code" || !sessionId) {
+    log(
+      "error",
+      `resposta ${reply.id} descartada: sem canal de entrega para "${externalId}" · bytes=${reply.content?.length ?? 0}`,
+    );
+    return;
+  }
 
   const nome = `claude-${sessionId.replace(/[^A-Za-z0-9._-]/g, "_").slice(0, 120)}.jsonl`;
   try {
@@ -1542,8 +1668,15 @@ function entregarNaSessao(externalId, reply) {
       path.join(HOOK_INBOX_DIR, nome),
       `${JSON.stringify({ id: reply.id, content: reply.content, at: new Date().toISOString() })}\n`,
     );
+    log(
+      "info",
+      `resposta ${reply.id} enfileirada · sessão=${sessionId} · bytes=${reply.content?.length ?? 0} · inbox=${nome}`,
+    );
   } catch (err) {
-    console.error("não consegui enfileirar a resposta para o hook:", err.message);
+    log(
+      "error",
+      `não consegui enfileirar a resposta ${reply.id} para o hook · sessão=${sessionId} · ${motivoDaFalha(err)}`,
+    );
   }
 }
 
@@ -1633,7 +1766,7 @@ async function tick() {
       }
       if (gravado) sent.set(file, nextOffset);
     } catch (err) {
-      console.error("erro em", file, motivoDaFalha(err));
+      log("error", "erro em", file, motivoDaFalha(err));
     }
   }
 
@@ -1651,7 +1784,7 @@ async function tick() {
       const data = await postSync(sessionPayload(m), []);
       deliverReplies(data, m.title || m.session_id);
     } catch (err) {
-      console.error("erro ao sincronizar", key, motivoDaFalha(err));
+      log("error", "erro ao sincronizar", key, motivoDaFalha(err));
     }
   });
 }
@@ -1716,23 +1849,36 @@ if (SHOW_VERSION) {
 } else if (PROBE) {
   probe();
 } else {
-  console.log(`Perfil do usuário: ${HOME}`);
-  console.log(`Session monitoring: ${MONITOR_ON ? "ligado" : "desligado"}`);
-  console.log("Transcrições monitoradas:");
-  DIRS.forEach((d) => console.log("  -", d));
-  console.log(`Enviando para ${URL_BASE} a cada ${INTERVAL}ms…`);
+  log("info", `agente ${AGENT_VERSION} (${AGENT_PLATFORM}) iniciado · pid=${process.pid}`);
+  log("info", `Perfil do usuário: ${HOME}`);
+  log("info", `Session monitoring: ${MONITOR_ON ? "ligado" : "desligado"}`);
+  log(
+    "info",
+    `Plugin: ${PLUGIN_STATUS}${INSTALL_ERROR ? ` · erro de instalação: ${INSTALL_ERROR}` : ""}`,
+  );
+  log("info", `Estado em ${STATE_DIR}`);
+  log("info", `Log em ${LOG_FILE ?? "só console (sem LRC_LOG_FILE nem LRC_STATE_DIR)"}`);
+  log("info", "Transcrições monitoradas:");
+  DIRS.forEach((d) => log("info", "  -", d));
+  log("info", `Enviando para ${URL_BASE} a cada ${INTERVAL}ms…`);
 
   // Laço auto-agendado, não `setInterval`: o timer disparava sem olhar se o
   // tick anterior tinha terminado. Com ~800ms de ida e volta e uma dúzia de
   // sessões, um tick passa de 7s e ficavam quatro em voo, sobrepostos — o que
   // fazia dois syncs da mesma sessão levarem a mesma resposta. Aqui o INTERVAL
   // é descanso ENTRE ticks, que é o que ele sempre quis dizer.
+  let ticks = 0;
   for (;;) {
     const comeco = Date.now();
     try {
       await tick();
+      // O primeiro tick em `info` e os seguintes em `debug`: é o primeiro que
+      // responde "o agente chegou a rodar?" — a pergunta que o log de 0 byte
+      // deixava sem resposta. Repetir isso a cada 2s só encheria o arquivo.
+      ticks += 1;
+      log(ticks === 1 ? "info" : "debug", `tick ${ticks} em ${Date.now() - comeco}ms`);
     } catch (e) {
-      console.error(motivoDaFalha(e));
+      log("error", motivoDaFalha(e));
     }
     // Dorme o QUE SOBRA do intervalo, não o intervalo inteiro: `LRC_INTERVAL` é
     // período de polling, não pausa entre ticks. Dormir 2s cheios depois de um
