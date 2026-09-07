@@ -2,4 +2,6 @@
 
 > GERADO — specctl index — NÃO EDITAR
 
-_Sem programas._
+## entrega-remota — aberto · 0/5 · owner @AllanFrancis
+- prontos: SPEC-20260906-1932-log-do-agente-observavel, SPEC-20260906-1932-kiro-aguardando-usuario-visivel, SPEC-20260906-1932-investigar-injecao-no-kiro
+- bloqueados: SPEC-20260906-1932-stop-espera-resposta-remota (aguarda SPEC-20260906-1932-log-do-agente-observavel), SPEC-20260906-1932-permissao-remota-ponta-a-ponta (aguarda SPEC-20260906-1932-log-do-agente-observavel, SPEC-20260906-1932-stop-espera-resposta-remota)
