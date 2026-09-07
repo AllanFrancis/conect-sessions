@@ -93,7 +93,7 @@ mentiria dizendo que ainda dá para responder.
 ## Critério de aceite
 
 - [x] Com uma sessão real do Kiro parada numa pergunta, `--probe` a mostra como `waiting` (hoje mostra `UNKNOWN`) (2026-09-07 00:13, commit `a28a7f6`, evidence: --probe com o Kiro vivo mostra [WAITING] sess_896799a5 e sess_98f85109 (antes [UNKNOWN]) — evidence/probe-depois.txt)
-- [ ] Essa mesma sessão aparece na lista do painel, com o estado legível
+- [ ] Essa mesma sessão aparece na lista do painel, com o estado legível [aceito-incompleto: "pode fechar" 2026-09-07 00:35]
 - [x] Sessão do Kiro com `waiting_on_user` em disco e nenhuma instância viva continua `finished`, não `waiting` (2026-09-07 00:13, commit `a28a7f6`, evidence: tests/installer/kiro-waiting.test.ts: perfil ~/.kiro semeado sem code.lock, waiting_on_user sai finished/confirmed)
 - [x] Os outros estados observados em disco (`idle`, `in_progress`, `failed`) mantêm a derivação de hoje (2026-09-07 00:13, commit `a28a7f6`, evidence: mesmo teste cobre idle/failed=finished e in_progress/ausente=unknown; medição real confirma as 13 sessões restantes inalteradas)
 - [x] O que a SPEC decidiu sobre a aprovação de ferramenta (status ou campo) está escrito no journal como `[decisão]` (2026-09-07 00:13, commit `a28a7f6`, evidence: [decisão] aprovação de ferramenta do Kiro vira status waiting, não campo novo — no LOG do journal)
