@@ -23,9 +23,12 @@ const canonicalUninstaller = readFileSync(canonicalUninstallerPath, "utf8");
 const canonicalProcessLib = readFileSync(canonicalProcessLibPath, "utf8");
 const installerScript = readFileSync(installerPath, "utf8");
 
-const tempRoot = resolve(
-  "docs/active/SPEC-20260905-2251-instalacao-simples/tmp/windows-installer-test",
-);
+// `.scratch/` e não `docs/active/<SPEC>/tmp/`: a SPEC que originou este teste já
+// foi arquivada, e o `mkdirSync` recursivo recriava a pasta em `docs/active/` a
+// cada execução — violando "docs/active vazio em main" sem o git ver, porque
+// diretório vazio não entra no índice. Sem SPEC ativa, descartável mora em
+// `.scratch/`.
+const tempRoot = resolve(".scratch/windows-installer-test");
 const fakeAgentPath = join(tempRoot, "release", "conect-agent.exe");
 const decoyAgentPath = join(tempRoot, "decoy", "decoy-agent.exe");
 const testRunRoot = "HKCU:\\Software\\ConectSessionsTests";

@@ -2,7 +2,7 @@
 
 ## SNAPSHOT (sobrescrever — DEVE caber nas primeiras 60 linhas do arquivo)
 
-**Última atualização:** 2026-09-06 22:20
+**Última atualização:** 2026-09-06 23:56
 **Onde tô:** implementação completa; 6/6 critérios com evidência de máquina, suítes verdes
 **Próximo passo:** commitar, carimbar os critérios com `check` e levar o fechamento ao usuário
 **Última decisão:** o agente vira dono de agent.log; launcher.ps1 para de redirecionar (ver LOG 21:51)
@@ -195,3 +195,81 @@ iniciado pelo launcher". Vou cobrir por teste automático o que dá (crítérios
 nível de função), mas a observação final em máquina instalada é do usuário. Isso NÃO é deferral: os
 critérios continuam `[ ]` até a evidência existir.
 ⎿ commit 2dbd065+dirty · 2 files changed, 152 deletions(-)
+
+## 2026-09-06 23:54 — [descoberta] o E2E falhava porque CLAUDE_CONFIG_DIR vazava para o teste; o agent.log novo foi quem mostrou
+
+O E2E do binário compilado (`tests/installer/windows-e2e.test.ts`) falhava por tempo esgotado
+esperando "a resposta na caixa de entrada da sessão" — 96s, o teto do `waitFor`. Não era regressão
+do log: o `agent.log` que esta SPEC criou foi justamente o que mostrou a causa.
+
+Capturado do `agent.log` do run que falhou (2026-09-07 03:39, cópia em `.scratch/e2e-diag/`):
+
+    INFO  Transcrições monitoradas:
+    INFO    - D:\VSCodeProfiles\Vinci\Claude\projects
+    INFO  resposta reply-e2e enfileirada · sessão=1fec14f6-6bb0-4610-944a-0938c40c7ebd · bytes=38
+
+A sessão `1fec14f6…` NÃO é a sessão semeada pelo teste (`e2e-1111…`): é uma sessão REAL desta
+máquina. O docblock do teste afirmava "USERPROFILE aponta para um perfil descartável, então o
+agente não enxerga as sessões reais" — a premissa é falsa. `remote-agent.mjs:92-106` lê
+`CLAUDE_CONFIG_DIR` ANTES de cair no `~/.claude`, e nesta máquina ela vale
+`D:\VSCodeProfiles\Vinci\Claude` — outro disco, alheio a `USERPROFILE`. O agente do teste varria as
+transcrições reais, uma delas sincronizava primeiro e consumia a única resposta que o servidor de
+mentira entrega (`replyDelivered`, guarda de uso único), e o inbox da sessão semeada nunca aparecia.
+
+Isto é anterior a esta SPEC — `CLAUDE_CONFIG_DIR` não tem relação com log. O que esta SPEC mudou foi
+tornar o defeito LEGÍVEL: sem `agent.log`, a leitura possível era "a entrega quebrou"; com ele, a
+linha diz para qual sessão a resposta foi. É o sinal de sucesso do main.md acontecendo numa falha
+que não era a prevista.
+
+Correção no teste, dois pontos:
+
+1. `isolatedEnv()` passa a sobrescrever `CLAUDE_CONFIG_DIR` junto de `USERPROFILE`, apontando para
+   dentro do perfil descartável. A pasta não existe, o filtro `existsSync` de `CLAUDE_HOMES` a
+   descarta, e a lista de homes fica vazia — que é o que este teste sempre quis.
+2. `tempRoot` sai de `docs/active/SPEC-20260905-2251-instalacao-simples/tmp/` (SPEC arquivada) para
+   `.scratch/windows-e2e`, mesmo motivo e mesmo precedente do commit `2dbd065`: o `mkdirSync`
+   recursivo recriava a pasta em `docs/active/` a cada run, violando "docs/active vazio em main" sem
+   o git ver, porque diretório vazio não entra no índice. Os dois diretórios órfãos foram removidos.
+
+Efeito colateral medido: o teste caiu de 96s para 12s — não varre mais as transcrições reais da
+máquina.
+⎿ commit b01be9e+dirty · 2 files changed, 39 insertions(+), 13 deletions(-)
+
+## 2026-09-06 23:56 — [conclusão] o agente escreve o proprio agent.log; o launcher parou de redirecionar
+
+`agent.log` deixou de ser decorativo. O agente escreve com handle próprio no caminho que
+`LRC_LOG_FILE` informa (o launcher passa o install root), com rotação a cada escrita no mesmo limite
+de 2MB e uma geração (`.1`), nível por `LRC_LOG` e redação do token antes da escrita. O
+`launcher.ps1` parou de redirecionar stdout/stderr — o redirecionamento não entregava nada (processo
+compilado com `--windows-hide-console`) e ainda prendia o handle que fazia o `rename` da rotação
+falhar. `agent.err.log` deixa de ser escrito: a trilha é única, com o nível na linha, porque o que o
+diagnóstico precisa é da ORDEM entre "o tick fez X" e "o sync falhou por Y".
+
+A entrega de resposta ganhou rastro nos três desfechos — enfileirada, descartada por falta de canal
+(o caso Kiro, que era `return` mudo), falha de escrita — sempre com sessão, id e TAMANHO, nunca o
+texto: o arquivo fica na pasta de instalação sem a proteção DPAPI do `config.json`. Pelo mesmo
+motivo, a linha `>> resposta remota para …` continua sendo `console.log` puro, e `probe()` fica fora
+do arquivo (é foreground e parseado por teste).
+
+Os 6 critérios estão evidenciados por teste automático: `tests/installer/agent-log.test.ts` (arranque
+e falha de sync com status e motivo sem token; entrega por sessão e id sem o texto; rotação em 2MB
+com o agente vivo; derivação do caminho pelo state dir; `LRC_LOG=0`) e
+`tests/installer/windows-e2e.test.ts`, que é o único lugar onde o binário REAL, compilado com
+`--windows-hide-console`, é iniciado pelo launcher REAL — a condição exata do defeito de origem. Se
+aquela asserção cair, o log voltou a ser decorativo.
+
+O próprio log cobrou o primeiro diagnóstico ainda dentro da SPEC: o E2E falhava por tempo esgotado, e
+foi a linha `resposta reply-e2e enfileirada · sessão=1fec14f6…` que mostrou que o teste não estava
+isolado das sessões reais da máquina (`CLAUDE_CONFIG_DIR`, commit `a1384fc`). O sinal de sucesso do
+main.md — "o motivo está no arquivo e ninguém precisa instrumentar a máquina" — aconteceu numa falha
+que não era a prevista.
+
+Verde: `bun test tests/installer tests/plugin tests/onboarding` 100 pass / 0 fail ·
+`bunx tsc --noEmit` limpo · `bun run lint` 0 erros (6 warnings pré-existentes em
+`src/components/ui/*`).
+
+Consequência de implantação, repetida aqui porque é o que morde depois: máquina já instalada precisa
+do comando de reparo do painel para receber o launcher novo. Sem ele, o launcher antigo segue
+redirecionando, o handle preso faz a rotação falhar em silêncio (fail-open, por invariante) e o log
+ainda assim tem conteúdo, porque a escrita é em append por handle próprio. Degradação, não quebra.
+⎿ commit a1384fc+dirty · 3 files changed, 47 insertions(+), 8 deletions(-)

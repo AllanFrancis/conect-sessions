@@ -1,13 +1,13 @@
 # SPEC-20260906-1932: log do agente que existe em disco
 
-**Status:** active
+**Status:** done
 **Porte:** P
 **Owner:** @AllanFrancis
 **Criada:** 2026-09-06 19:32
 **Ativada:** 2026-09-06 21:45
-**Concluída:** —
+**Concluída:** 2026-09-06 23:56
 **Pausada em:** —
-**Commit final:** —
+**Commit final:** `a1384fc`
 **Keywords:** agente, log, diagnóstico, observabilidade
 **Features:** dashboard
 **Branch:** feature/log-do-agente-observavel
@@ -83,9 +83,9 @@ Escrita própria em append dentro do install root, com rotação por tamanho. Re
 
 ## Critério de aceite
 
-- [ ] Com o agente instalado e iniciado pelo launcher, `agent.log` tem conteúdo depois do primeiro tick
-- [ ] Uma falha de sync (token inválido) aparece no log com o status HTTP e o motivo
-- [ ] Uma resposta escrita no inbox aparece no log com a sessão de destino e o id da resposta
-- [ ] O texto da resposta NÃO aparece no log
-- [ ] O token NÃO aparece no log (busca pelo valor em claro no arquivo volta vazia)
-- [ ] O log rotaciona ao passar do limite e o agente continua rodando
+- [x] Com o agente instalado e iniciado pelo launcher, `agent.log` tem conteúdo depois do primeiro tick (2026-09-06 23:55, commit `b01be9e`, evidence: windows-e2e.test.ts: binário compilado iniciado pelo launcher real; agent.log tem 'iniciado' e 'tick 1' (verde 2026-09-06 23:47, 12s))
+- [x] Uma falha de sync (token inválido) aparece no log com o status HTTP e o motivo (2026-09-06 23:55, commit `b01be9e`, evidence: agent-log.test.ts:132 'grava o arranque e a falha de sync com status e motivo, sem o token' (bun test tests/installer verde))
+- [x] Uma resposta escrita no inbox aparece no log com a sessão de destino e o id da resposta (2026-09-06 23:55, commit `b01be9e`, evidence: agent-log.test.ts:165 + windows-e2e: 'resposta reply-e2e enfileirada · sessão=<id> · bytes=38 · inbox=<arquivo>' no log do binário real)
+- [x] O texto da resposta NÃO aparece no log (2026-09-06 23:55, commit `b01be9e`, evidence: windows-e2e: expect(agentLog).not.toContain(replyContent) + agent-log.test.ts:165; o log leva bytes=, o inbox leva o texto)
+- [x] O token NÃO aparece no log (busca pelo valor em claro no arquivo volta vazia) (2026-09-06 23:55, commit `b01be9e`, evidence: windows-e2e: expect(agentLog).not.toContain(permanentToken) com token real de pareamento em disco; redação por construção antes da escrita)
+- [x] O log rotaciona ao passar do limite e o agente continua rodando (2026-09-06 23:55, commit `b01be9e`, evidence: agent-log.test.ts:208 'rotaciona ao passar de 2MB e continua rodando' (.1, uma geração, agente segue vivo))

@@ -23,8 +23,8 @@
 - SPEC-20260905-1944 | 2026-09-05 | `PENDENTE` | Sessão e lista em layout de celular: conversa com bolhas e cards arredondados
 - SPEC-20260905-2251 | 2026-09-06 | `PENDENTE` | Instalação por um comando no Windows: pareamento de uso único, agente autossuficiente, plugin do Claude Code e jornada guiada de máquinas no painel
 - SPEC-20260906-1146 | 2026-09-06 | `PENDENTE` | Bootstrap servido sem BOM: o comando único voltou a ser aceito por [scriptblock]::Create()
+- SPEC-20260906-1932 | 2026-09-06 | `PENDENTE` | O agente escreve o próprio `agent.log` (o launcher parou de redirecionar): motivo do sync, entrega por sessão e id, nunca o token nem o texto
 ### Planejadas (future/)
-- SPEC-20260906-1932-log-do-agente-observavel | Log do agente que existe em disco | `agent.log` fica com 0 bytes (`--windows-hide-console` descarta stdout): todo diagnóstico de entrega é adivinhação
 - SPEC-20260906-1932-kiro-aguardando-usuario-visivel | Sessão do Kiro esperando o usuário fica visível no painel | `waiting_on_user` não tem braço no adaptador, cai em `unknown`, e a lista filtra `active`
 - SPEC-20260906-1932-stop-espera-resposta-remota | A resposta remota chega na sessão parada | o `Stop` drena o inbox uma vez e sem esperar; em sessão idle nenhum hook dispara e a fala fica no arquivo
 - SPEC-20260906-1932-permissao-remota-ponta-a-ponta | Pedido de permissão vai e volta pelo painel | `LRC_PERM` nasce desligado e nada no produto o liga; o `pending/` não é lido nem sincronizado
