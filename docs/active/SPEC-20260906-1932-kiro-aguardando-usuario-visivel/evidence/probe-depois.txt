@@ -1,0 +1,176 @@
+Remote Session Monitor — sondagem em 2026-09-07T04:13:21.829Z
+plataforma=win32 snapshot=ok
+processos vistos: 434 · logs do Kiro travados: 20260906T123308492
+sessões encontradas: 20
+
+[WAITING] kiro sess_896799a5-bc8c-482b-b0e8-818d3971526d
+  ide=Kiro  pid=12060  confiança=inferred
+  projeto=c:\dev\vinci-stack
+  início=2026-09-05T01:30:24.045Z  atividade=2026-09-05T01:41:30.665Z  fim=—
+  fontes=kiro:session-file+kiro:messages+kiro:session-index+kiro:process+kiro:log-lock+kiro:open-folders
+    · session.json status=waiting_on_user
+    · Kiro vivo com o workspace aberto e session.json parado em waiting_on_user; sessão ausente do log desta execução
+
+[WAITING] kiro sess_98f85109-c691-4dba-937a-f0ad3975baa9
+  ide=Kiro  pid=12060  confiança=inferred
+  projeto=c:\dev\meus projetos\conect-sessions
+  início=2026-09-07T01:37:41.524Z  atividade=2026-09-07T02:31:12.428Z  fim=—
+  fontes=kiro:session-file+kiro:messages+kiro:session-index+kiro:process+kiro:log-lock+kiro:open-folders
+    · session.json status=waiting_on_user
+    · Kiro vivo com o workspace aberto e session.json parado em waiting_on_user; sessão ausente do log desta execução
+
+[ACTIVE] kiro sess_eeb2050d-9964-41de-9eae-89b7b9235766
+  ide=Kiro  pid=12060  confiança=confirmed
+  projeto=c:\dev\vinci-stack
+  início=2026-09-06T03:29:54.653Z  atividade=2026-09-07T04:12:52.108Z  fim=—
+  fontes=kiro:session-file+kiro:messages+kiro:session-index+kiro:process+kiro:log-lock
+    · session.json status=in_progress
+    · presente no log da instância viva do Kiro
+
+[ACTIVE] claude-code 77d666b5-b2cd-42dc-909e-ea7ebfe6c503
+  ide=Visual Studio Code  pid=1940  confiança=confirmed
+  projeto=c:\dev\meus projetos\conect-sessions
+  início=2026-09-07T04:03:16.314Z  atividade=2026-09-07T04:13:19.133Z  fim=—
+  fontes=claude:pid-registry+claude:process+claude:ide-lock+claude:transcript
+    · PID 1940 vivo com procStart idêntico (134332273953071728)
+    · ancestral PID 37696 é dono do lock 57966 (Visual Studio Code)
+
+[ACTIVE] kiro sess_c1e9b332-ff9c-4b7d-af73-1f52742837c7
+  ide=Kiro  pid=12060  confiança=confirmed
+  projeto=c:\dev\vinci-stack
+  início=2026-09-07T04:07:49.424Z  atividade=2026-09-07T04:13:11.552Z  fim=—
+  fontes=kiro:session-file+kiro:messages+kiro:session-index+kiro:process+kiro:log-lock
+    · session.json status=in_progress
+    · presente no log da instância viva do Kiro
+
+[IDLE] claude-code 66c68185-db69-4d97-af30-25f373bb2ce6
+  ide=Visual Studio Code  pid=6444  confiança=confirmed
+  projeto=c:\dev\meus projetos\conect-sessions
+  início=2026-09-07T03:34:04.098Z  atividade=2026-09-07T03:59:31.600Z  fim=—
+  fontes=claude:pid-registry+claude:process+claude:ide-lock+claude:transcript
+    · PID 6444 vivo com procStart idêntico (134332256429895813)
+    · ancestral PID 37696 é dono do lock 57966 (Visual Studio Code)
+
+[IDLE] claude-code 856c94e3-2f77-4d56-a89e-81855423c62f
+  ide=Visual Studio Code  pid=26408  confiança=inferred
+  projeto=c:\dev\meus projetos\conect-sessions
+  início=2026-09-07T04:03:07.712Z  atividade=desconhecida  fim=—
+  fontes=claude:pid-registry+claude:process+claude:ide-lock
+    · PID 26408 vivo com procStart idêntico (134332273867709913)
+    · ancestral PID 37696 é dono do lock 57966 (Visual Studio Code)
+    · transcrição não encontrada: atividade não medida
+
+[UNKNOWN] kiro sess_6dbed42c-3107-405c-8103-5d3897c159f9
+  ide=Kiro  pid=n/a  confiança=unknown
+  projeto=c:\dev\vinci-stack
+  início=2026-09-04T05:45:53.167Z  atividade=2026-09-04T06:40:59.574Z  fim=—
+  fontes=kiro:session-file+kiro:messages+kiro:session-index+kiro:process+kiro:log-lock+kiro:open-folders
+    · session.json status=idle
+    · workspace aberto mas sessão ausente do log desta execução: aba aberta e intocada é indistinguível de aba fechada
+
+[UNKNOWN] kiro sess_169703b9-2008-4cea-b629-b27f7ae90c18
+  ide=Kiro  pid=n/a  confiança=unknown
+  projeto=c:\dev\vinci-stack
+  início=2026-09-04T16:52:41.195Z  atividade=2026-09-05T01:10:38.608Z  fim=—
+  fontes=kiro:session-file+kiro:messages+kiro:session-index+kiro:process+kiro:log-lock+kiro:open-folders
+    · session.json status=idle
+    · workspace aberto mas sessão ausente do log desta execução: aba aberta e intocada é indistinguível de aba fechada
+
+[UNKNOWN] kiro sess_6ee3f758-9275-4c1d-b96c-f654eebabaaa
+  ide=Kiro  pid=n/a  confiança=unknown
+  projeto=c:\dev\vinci-stack
+  início=2026-09-05T01:30:22.759Z  atividade=2026-09-05T01:30:24.212Z  fim=—
+  fontes=kiro:session-file+kiro:session-index+kiro:process+kiro:log-lock+kiro:open-folders
+    · session.json status=ausente
+    · workspace aberto mas sessão ausente do log desta execução: aba aberta e intocada é indistinguível de aba fechada
+
+[UNKNOWN] kiro sess_a48a868b-4b0e-4515-a35e-26e75a1544c2
+  ide=Kiro  pid=n/a  confiança=unknown
+  projeto=c:\dev\meus projetos\conect-sessions
+  início=2026-09-06T03:48:21.772Z  atividade=2026-09-06T05:12:41.883Z  fim=—
+  fontes=kiro:session-file+kiro:messages+kiro:session-index+kiro:process+kiro:log-lock+kiro:open-folders
+    · session.json status=idle
+    · workspace aberto mas sessão ausente do log desta execução: aba aberta e intocada é indistinguível de aba fechada
+
+[UNKNOWN] kiro sess_15a05361-00d0-4669-95e1-ad4f5949dbdc
+  ide=Kiro  pid=n/a  confiança=unknown
+  projeto=c:\dev\meus projetos\conect-sessions
+  início=2026-09-06T12:32:43.796Z  atividade=2026-09-07T01:37:21.796Z  fim=—
+  fontes=kiro:session-file+kiro:messages+kiro:session-index+kiro:process+kiro:log-lock+kiro:open-folders
+    · session.json status=idle
+    · workspace aberto mas sessão ausente do log desta execução: aba aberta e intocada é indistinguível de aba fechada
+
+[UNKNOWN] kiro sess_1067fdcf-d91a-46fe-aafd-e6799b0c6ff7
+  ide=Kiro  pid=n/a  confiança=unknown
+  projeto=c:\dev\vinci-stack
+  início=2026-09-07T04:07:48.574Z  atividade=2026-09-07T04:07:49.448Z  fim=—
+  fontes=kiro:session-file+kiro:session-index+kiro:process+kiro:log-lock+kiro:open-folders
+    · session.json status=ausente
+    · workspace aberto mas sessão ausente do log desta execução: aba aberta e intocada é indistinguível de aba fechada
+
+[FINISHED] kiro sess_f0db3012-c942-4f07-aafa-c98e4e2c2c88
+  ide=Kiro  pid=n/a  confiança=confirmed
+  projeto=c:\dev\wynk\wynk_crm
+  início=2026-08-31T15:09:13.364Z  atividade=2026-08-31T15:09:13.376Z  fim=—
+  fontes=kiro:session-file+kiro:session-index+kiro:process+kiro:log-lock+kiro:open-folders
+    · session.json status=ausente
+    · workspace não está aberto em nenhuma janela do Kiro
+
+[FINISHED] kiro sess_8102da5b-971c-4bc9-86fa-00191efe4c36
+  ide=Kiro  pid=n/a  confiança=confirmed
+  projeto=c:\dev\meus projetos\inglês
+  início=2026-08-31T16:36:51.039Z  atividade=2026-08-31T20:59:24.893Z  fim=—
+  fontes=kiro:session-file+kiro:messages+kiro:session-index+kiro:process+kiro:log-lock+kiro:open-folders
+    · session.json status=idle
+    · workspace não está aberto em nenhuma janela do Kiro
+
+[FINISHED] kiro sess_61f43e98-7a56-4cc9-b317-835251af0deb
+  ide=Kiro  pid=n/a  confiança=confirmed
+  projeto=c:\dev\meus projetos\inglês
+  início=2026-08-31T20:42:49.914Z  atividade=2026-08-31T20:43:05.100Z  fim=—
+  fontes=kiro:session-file+kiro:session-index+kiro:process+kiro:log-lock+kiro:open-folders
+    · session.json status=ausente
+    · workspace não está aberto em nenhuma janela do Kiro
+
+[FINISHED] kiro sess_aad63076-9f8f-4b1a-9d44-0a6202c9bcb5
+  ide=Kiro  pid=n/a  confiança=confirmed
+  projeto=c:\dev\meus projetos\SpeakMate
+  início=2026-08-31T20:54:06.925Z  atividade=2026-08-31T22:58:30.712Z  fim=—
+  fontes=kiro:session-file+kiro:messages+kiro:session-index+kiro:process+kiro:log-lock+kiro:open-folders
+    · session.json status=idle
+    · workspace não está aberto em nenhuma janela do Kiro
+
+[FINISHED] kiro sess_da8373f9-c73f-40db-8277-817fdc386dd8
+  ide=Kiro  pid=n/a  confiança=confirmed
+  projeto=c:\dev\meus projetos\SpeakMate
+  início=2026-08-31T22:24:58.042Z  atividade=2026-08-31T23:34:10.887Z  fim=—
+  fontes=kiro:session-file+kiro:messages+kiro:session-index+kiro:process+kiro:log-lock+kiro:open-folders
+    · session.json status=failed
+    · workspace não está aberto em nenhuma janela do Kiro
+
+[FINISHED] kiro sess_963d4166-3b8c-4ba6-86f8-ed80515b7ad2
+  ide=Kiro  pid=n/a  confiança=confirmed
+  projeto=c:\dev\meus projetos\SpeakMate
+  início=2026-08-31T23:00:37.616Z  atividade=2026-09-01T01:32:37.801Z  fim=—
+  fontes=kiro:session-file+kiro:messages+kiro:session-index+kiro:process+kiro:log-lock+kiro:open-folders
+    · session.json status=idle
+    · workspace não está aberto em nenhuma janela do Kiro
+
+[FINISHED] kiro sess_aae0187b-8fe8-4d18-b274-65abff4915bc
+  ide=Kiro  pid=n/a  confiança=confirmed
+  projeto=c:\dev\wynk\wynk_crm
+  início=2026-09-01T18:46:47.742Z  atividade=2026-09-01T18:55:33.018Z  fim=—
+  fontes=kiro:session-file+kiro:messages+kiro:session-index+kiro:process+kiro:log-lock+kiro:open-folders
+    · session.json status=idle
+    · workspace não está aberto em nenhuma janela do Kiro
+
+Resumo: 7 sessão(ões) viva(s).
+  - kiro · Kiro · c:\dev\vinci-stack · waiting
+  - kiro · Kiro · c:\dev\meus projetos\conect-sessions · waiting
+  - kiro · Kiro · c:\dev\vinci-stack · active
+  - claude-code · Visual Studio Code · c:\dev\meus projetos\conect-sessions · active
+  - kiro · Kiro · c:\dev\vinci-stack · active
+  - claude-code · Visual Studio Code · c:\dev\meus projetos\conect-sessions · idle
+  - claude-code · Visual Studio Code · c:\dev\meus projetos\conect-sessions · idle
+
+Confira contra as abas realmente abertas na IDE.

@@ -199,12 +199,17 @@ export function TermLine({
 const statusColor: Record<string, string> = {
   // vocabulário do session monitor
   active: "text-primary",
+  // `waiting` deixou de ser só valor legado: o monitor passou a emiti-lo de
+  // propósito para a sessão do Kiro parada numa pergunta ou numa aprovação de
+  // ferramenta (SPEC-20260906-1932-kiro-aguardando-usuario-visivel). A cor de
+  // alerta que já estava aqui é a certa nos dois casos — é a sessão travada
+  // esperando a pessoa.
+  waiting: "text-destructive",
   idle: "text-muted-foreground",
   finished: "text-muted-foreground",
   unknown: "text-muted-foreground",
   // valores legados de agentes ainda não atualizados
   running: "text-primary",
-  waiting: "text-destructive",
   error: "text-destructive",
   done: "text-muted-foreground",
 };
@@ -214,6 +219,9 @@ const statusColor: Record<string, string> = {
 const statusMarker: Record<string, string> = {
   active: "✳",
   running: "✳",
+  // "!" separa a sessão travada da que está trabalhando: as duas estão vivas,
+  // mas só uma depende de você para andar.
+  waiting: "!",
   unknown: "?",
   finished: "○",
   done: "○",

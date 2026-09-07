@@ -739,14 +739,20 @@ function mergeClaude(doRegistro, doHook) {
 
 /**
  * O Kiro grava ~/.kiro/sessions/<wsHash>/sess_<uuid>/session.json com um campo
- * `status` escrito pela própria aplicação (in_progress | idle | failed), mais
- * createdAt, lastModifiedAt e workspacePaths. O índice append-only
- * ~/.kiro/session-index/<wsHash>.jsonl registra criação e remoção.
+ * `status` escrito pela própria aplicação (in_progress | idle | failed |
+ * waiting_on_user), mais createdAt, lastModifiedAt e workspacePaths. O índice
+ * append-only ~/.kiro/session-index/<wsHash>.jsonl registra criação e remoção.
  *
  * `status` sozinho não prova vida: se o Kiro morrer no meio de um turno, o
  * arquivo fica congelado em "in_progress". Por isso `in_progress` só vira
  * `active` quando existe uma instância do Kiro viva cujo kiro.log está com
  * handle travado E menciona aquele sessionId. Sem isso, vira `unknown`.
+ *
+ * `waiting_on_user` é o que o Kiro escreve quando o turno para para perguntar
+ * algo — a sessão que MAIS precisa de atenção remota. Ele vira `waiting` no
+ * transporte (`waiting_on_user` é vocabulário do Kiro e não vaza no payload),
+ * mas só enquanto existe Kiro vivo com o workspace dela aberto: sem isso a
+ * pergunta congelou junto com o processo e o estado é `finished`.
  */
 
 /** Pastas abertas nas janelas do Kiro, lidas do storage.json do user-data-dir. */
@@ -916,6 +922,13 @@ function detectKiroSessions(snap) {
           s.status = "finished";
           s.confidence = "confirmed";
           s.evidence.push("nenhuma instância do Kiro viva");
+        } else if (declared === "waiting_on_user") {
+          // A pergunta ficou congelada com o processo: ninguém está esperando
+          // resposta do outro lado. Dizer `waiting` aqui prometeria uma
+          // interação que não existe mais.
+          s.status = "finished";
+          s.confidence = "confirmed";
+          s.evidence.push("pergunta ao usuário congelada: nenhuma instância do Kiro viva");
         } else {
           // Congelou em in_progress (ou schema antigo sem status) sem processo:
           // o turno foi interrompido e o fim nunca foi gravado.
@@ -941,6 +954,18 @@ function detectKiroSessions(snap) {
             s.status = "finished";
             s.confidence = "confirmed";
             s.evidence.push("workspace não está aberto em nenhuma janela do Kiro");
+          } else if (wsOpen === true && declared === "waiting_on_user") {
+            // A pergunta é fato gravado pelo próprio Kiro, e o Kiro está vivo
+            // com o workspace dela aberto — a espera não morreu. O que o disco
+            // não conta é se a aba segue carregada nesta execução, e é só isso
+            // que o `inferred` está dizendo. Ficar em `unknown` aqui esconderia
+            // do painel exatamente a sessão que precisa do usuário.
+            s.pid = live.pid;
+            s.status = "waiting";
+            s.confidence = "inferred";
+            s.evidence.push(
+              "Kiro vivo com o workspace aberto e session.json parado em waiting_on_user; sessão ausente do log desta execução",
+            );
           } else if (wsOpen === true) {
             s.status = "unknown";
             s.confidence = "unknown";
@@ -954,14 +979,24 @@ function detectKiroSessions(snap) {
           }
         } else if (declared === "in_progress") {
           s.pid = live.pid;
-          s.status = "active";
           s.confidence = "confirmed";
           if (last.includes("ToolApproval] Requesting permission")) {
+            // Aprovação pendente é espera pelo usuário, igual à pergunta —
+            // ver [decisão] em SPEC-20260906-1932-kiro-aguardando-usuario-visivel.
+            s.status = "waiting";
             s.evidence.push("último evento: aguardando aprovação de ferramenta pelo usuário");
-          } else if (last.includes("model.invoke.start")) {
-            s.evidence.push("último evento: turno em execução no modelo");
+          } else {
+            s.status = "active";
+            if (last.includes("model.invoke.start")) {
+              s.evidence.push("último evento: turno em execução no modelo");
+            }
           }
           s.evidence.push("presente no log da instância viva do Kiro");
+        } else if (declared === "waiting_on_user") {
+          s.pid = live.pid;
+          s.status = "waiting";
+          s.confidence = "confirmed";
+          s.evidence.push("aberta na instância viva, parada esperando o usuário");
         } else if (declared === "idle") {
           s.pid = live.pid;
           s.status = "idle";
@@ -1810,7 +1845,7 @@ function probe() {
   );
   console.log(`sessões encontradas: ${found.length}\n`);
 
-  const order = { active: 0, idle: 1, unknown: 2, finished: 3 };
+  const order = { waiting: 0, active: 1, idle: 2, unknown: 3, finished: 4 };
   found.sort(
     (a, b) =>
       order[a.status] - order[b.status] || String(a.started_at).localeCompare(String(b.started_at)),
@@ -1830,7 +1865,9 @@ function probe() {
     console.log("");
   }
 
-  const ativas = found.filter((s) => s.status === "active" || s.status === "idle");
+  const ativas = found.filter(
+    (s) => s.status === "active" || s.status === "waiting" || s.status === "idle",
+  );
   console.log(`Resumo: ${ativas.length} sessão(ões) viva(s).`);
   for (const s of ativas) {
     console.log(

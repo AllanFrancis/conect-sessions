@@ -49,3 +49,29 @@ export function relativeTime(value?: string | null, now: Date = new Date()): str
   if (horas < 24) return `há ${horas} h`;
   return new Date(t).toLocaleDateString("pt-BR", { day: "numeric", month: "short" });
 }
+
+/**
+ * Os estados que a lista do painel mostra.
+ *
+ * A DEC-20260904-1443 fechou a lista em `active` para tirar dela o ruído das
+ * sessões mortas, e isso continua valendo: `idle` e `unknown` seguem fora.
+ * `waiting` entra por inclusão explícita DESSE estado, não por afrouxar o
+ * filtro — é a sessão que parou esperando o usuário e que, sem o painel, ele
+ * só descobre chegando no computador. Era a única que não aparecia, e é a que
+ * mais precisa aparecer.
+ */
+export const STATUS_NO_PAINEL = ["active", "waiting"] as const;
+
+/**
+ * A palavra do estado ganha a cor do estado, como o marcador já tem.
+ *
+ * Num cartão a pessoa lê a palavra antes do símbolo; deixar as duas coisas
+ * dizendo a mesma coisa é o que faz "está rodando" saltar sem precisar
+ * procurar. Só os dois estados que pedem os olhos dela recebem destaque — se
+ * tudo destacasse, nada destacaria. `waiting` puxa mais que `active` porque é o
+ * único que não anda sozinho: sem o usuário, fica parado para sempre.
+ */
+export function statusTone(status: string): string {
+  if (status === "waiting") return "text-destructive";
+  return status === "active" || status === "running" ? "text-primary" : "";
+}

@@ -160,7 +160,7 @@ O Kiro **não** tem processo por sessão — todas vivem dentro da mesma IDE. A 
 ### Fontes
 
 - `~/.kiro/sessions/<wsHash>/sess_<uuid>/session.json` — a própria aplicação grava
-  `status` (`in_progress` | `idle` | `failed`), `createdAt`, `lastModifiedAt`,
+  `status` (`in_progress` | `idle` | `failed` | `waiting_on_user`), `createdAt`, `lastModifiedAt`,
   `title`, `workspacePaths`, `modelId`, `agentMode`. Isto é muito melhor que
   heurística de mtime: é o estado declarado pelo autor do dado.
 - `~/.kiro/session-index/<wsHash>.jsonl` — log append-only de `{op:"add"|"remove",
@@ -201,19 +201,39 @@ Para separar os casos o monitor lê as pastas realmente abertas em
 
 | Instância viva | Workspace aberto | No log da execução | `status` do arquivo | Resultado |
 | --- | --- | --- | --- | --- |
+| sim | — | sim | `in_progress` + última linha de aprovação pendente | `waiting` |
 | sim | — | sim | `in_progress` | `active` |
+| sim | — | sim | `waiting_on_user` | `waiting` |
 | sim | — | sim | `idle` | `idle` |
 | sim | não | não | qualquer | `finished` |
-| sim | **sim** | não | qualquer | **`unknown`** |
-| não | — | — | `idle`/`failed` | `finished` |
+| sim | **sim** | não | `waiting_on_user` | **`waiting`** (`inferred`) |
+| sim | **sim** | não | qualquer outro | **`unknown`** |
+| não | — | — | `idle`/`failed`/`waiting_on_user` | `finished` |
 | não | — | — | `in_progress`/ausente | `unknown` |
 | — | — | — | `remove` no índice | `finished` |
 
-A linha em negrito é deliberada: preferimos dizer "não sei" a inventar um estado.
+A linha `unknown` em negrito é deliberada: preferimos dizer "não sei" a inventar
+um estado. A linha `waiting` logo acima dela é a exceção medida, e só porque o
+que falta ali é diferente: a pergunta ao usuário é fato gravado pelo PRÓPRIO
+Kiro, e o Kiro está vivo com o workspace dela aberto. O que o disco não conta é
+se a aba segue carregada nesta execução — e é isso, e só isso, que o
+`confidence: inferred` está dizendo. Era o caso das duas sessões reais desta
+máquina (`sess_98f85109`, `sess_896799a5`): as que mais precisavam de atenção
+remota eram as únicas que o painel não mostrava.
 
-O log ainda refina a evidência textual de um `active`: `model.invoke.start` indica
-turno rodando no modelo; `[ACP ToolApproval] Requesting permission` indica que o
-agente está parado esperando o usuário aprovar uma ferramenta.
+Sem instância viva, `waiting_on_user` acompanha `idle`/`failed` e vira
+`finished`: a pergunta congelou junto com o processo, e dizer `waiting` ali
+prometeria uma interação que não existe mais.
+
+`waiting_on_user` é vocabulário do Kiro e **não vaza** para o payload — o estado
+transportado é `waiting`, que o zod de `/sync` já aceitava.
+
+O log ainda refina a leitura de um `in_progress`: `model.invoke.start` indica
+turno rodando no modelo (segue `active`); `[ACP ToolApproval] Requesting
+permission` indica que o agente parou esperando o usuário aprovar uma ferramenta
+— e isso também é `waiting`, porque é o mesmo estado da pergunta: o turno não
+anda sem a pessoa. A distinção entre as duas causas continua na `evidence[]`, que
+é onde ela é usada (diagnóstico local pelo `--probe`).
 
 ---
 
@@ -226,7 +246,7 @@ registro e são unidos por `monitorScan()`:
 | --- | --- | --- |
 | `agent` | `claude-code` | `kiro` |
 | `session_id` | uuid do `sessionId` | `sess_<uuid>` |
-| `status` | `active` \| `idle` \| `finished` \| `unknown` | idem |
+| `status` | `active` \| `idle` \| `finished` \| `unknown` | idem, mais `waiting` |
 | `ide` | cadeia de pais → lock | sempre `Kiro` |
 | `project` | `cwd` do registro | `workspacePaths` |
 | `pid` | PID do processo da sessão | PID da IDE, só quando a sessão é dela |
@@ -364,6 +384,11 @@ Nenhuma sessão viva foi omitida e nenhuma morta foi dada como viva.
   nascer no mesmo milissegundo do antigo.
 - Sessão do Kiro marcada `in_progress` e presente no log, mas cuja aba o usuário
   fechou sem o Kiro atualizar o arquivo. Não observado nos testes.
+- Sessão do Kiro em `waiting_on_user` cuja aba o usuário já fechou, com o Kiro
+  ainda vivo e o workspace aberto: sai `waiting` (`inferred`) e a pergunta não
+  existe mais na tela. É o preço aceito para não esconder a sessão que espera —
+  o `inferred` é o aviso, e o custo do erro contrário (o usuário nunca fica
+  sabendo da pergunta) é maior.
 
 **Falsos negativos possíveis**
 

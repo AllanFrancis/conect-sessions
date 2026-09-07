@@ -9,19 +9,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { projectName, relativeTime, sessionTitle } from "@/lib/session-display";
+import {
+  projectName,
+  relativeTime,
+  sessionTitle,
+  statusTone,
+  STATUS_NO_PAINEL,
+} from "@/lib/session-display";
 import { cn } from "@/lib/utils";
-
-/**
- * A palavra do estado ganha a cor do estado, como o marcador já tem.
- *
- * Num cartão a pessoa lê a palavra antes do símbolo; deixar as duas coisas
- * dizendo a mesma coisa é o que faz "está rodando" saltar sem precisar
- * procurar. Só `active` recebe destaque — se tudo destacasse, nada destacaria.
- */
-function statusTone(status: string): string {
-  return status === "active" || status === "running" ? "text-primary" : "";
-}
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({
@@ -44,13 +39,13 @@ function Dashboard() {
   const navigate = useNavigate();
 
   const { data, isLoading } = useQuery({
-    queryKey: ["sessions", "active"],
+    queryKey: ["sessions", "painel"],
     refetchInterval: 3000,
     queryFn: async () => {
       const { data: rows, error } = await supabase
         .from("sessions")
         .select("id, title, source, status, cwd, last_activity_at, ide, pid, detection_confidence")
-        .eq("status", "active")
+        .in("status", [...STATUS_NO_PAINEL])
         .order("last_activity_at", { ascending: false });
       if (error) throw error;
       const sessions = rows ?? [];
@@ -116,9 +111,11 @@ function Dashboard() {
 
         <section className="mt-6">
           <div className="flex items-baseline justify-between gap-2">
-            <h2 className="text-muted-foreground">Sessões ativas</h2>
-            {/* O painel lista SÓ sessão ativa (SPEC-20260904-1433) — dizer isso aqui
-                evita a leitura de que a lista está vazia por falta de sessão. */}
+            <h2 className="text-muted-foreground">Ativas e esperando você</h2>
+            {/* O painel lista SÓ sessão ativa (SPEC-20260904-1433) mais a que parou
+                esperando o usuário (SPEC-20260906-1932-kiro-aguardando-usuario-visivel)
+                — dizer isso aqui evita a leitura de que a lista está vazia por falta
+                de sessão. */}
             <span className="text-xs text-muted-foreground">atualiza a cada 3s</span>
           </div>
 
@@ -127,9 +124,10 @@ function Dashboard() {
               <p className="text-muted-foreground">✳ Carregando…</p>
             ) : sessions.length === 0 ? (
               <div className="rounded-2xl border border-border bg-card px-4 py-4 text-muted-foreground">
-                <p className="text-foreground">Nenhuma sessão ativa agora.</p>
+                <p className="text-foreground">Nenhuma sessão ativa ou esperando você agora.</p>
                 <p className="mt-1">
-                  O painel lista apenas sessões rodando neste momento. Crie um token em{" "}
+                  O painel lista as sessões rodando neste momento e as que pararam esperando uma
+                  resposta sua. Crie um token em{" "}
                   <Link to="/agents" className="text-primary hover:underline">
                     Máquinas &amp; tokens
                   </Link>{" "}
@@ -181,7 +179,7 @@ function Dashboard() {
           </div>
         </section>
 
-        <TermHints items={["somente sessões ativas", "projeto = pasta lida pelo agente"]} />
+        <TermHints items={["rodando ou esperando você", "projeto = pasta lida pelo agente"]} />
       </div>
     </div>
   );
